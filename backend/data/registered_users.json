@@ -1,0 +1,14 @@
+[
+  {
+    "id": "TRN-3210",
+    "name": "Rahul Sharma",
+    "email": "rahul.sharma@test.gov.in",
+    "phone": "919876543210",
+    "role": "client",
+    "course": "Solar Technician",
+    "district": "Pune",
+    "employer": "Tata Power",
+    "salary": 22000,
+    "registered_at": "2026-09-10 17:19:17 UTC"
+  }
+]
