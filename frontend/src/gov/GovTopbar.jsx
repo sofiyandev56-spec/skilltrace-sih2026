@@ -34,11 +34,9 @@ export default function GovTopbar() {
 
       <div className="gov-topbar">
         <div className="gov-topbar__inner">
+          {/* Utilities only. The government's identity belongs to the masthead
+              below, and repeating it here just said the same thing twice. */}
           <div className="gov-topbar__left">
-            <span className="gov-topbar__pill">
-              <i className="gov-topbar__pill-dot" aria-hidden="true" />
-              {t('govOfIndia')}
-            </span>
             <button
               type="button"
               className="gov-topbar__reader"
