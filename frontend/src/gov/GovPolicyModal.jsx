@@ -143,7 +143,7 @@ const POLICY_SECTIONS = [
 ]
 
 export default function GovPolicyModal() {
-  const { policyModal, setPolicyTab, closePolicy, lang } = useGov()
+  const { policyModal, setPolicyTab, closePolicy, lang, textSize, setTextSize, t } = useGov()
   if (!policyModal.open) return null
 
   const active = POLICY_SECTIONS.find((s) => s.id === policyModal.tab) || POLICY_SECTIONS[0]
@@ -156,14 +156,52 @@ export default function GovPolicyModal() {
             <span className="gov-modal__tag">GIGW 3.0 / भारत सरकार</span>
             <h3>{lang === 'hi' ? active.titleHi : active.title}</h3>
           </div>
-          <button
-            type="button"
-            className="gov-modal__close"
-            onClick={closePolicy}
-            aria-label="Close modal"
-          >
-            &times;
-          </button>
+          <div className="gov-modal__header-actions">
+            <div className="gov-text-controls gov-text-controls--modal" role="group" aria-label={t('textSize')}>
+              <span className="gov-text-controls__label">{t('textSize')}</span>
+              <button
+                type="button"
+                className={`gov-text-btn ${textSize < 0.95 ? 'is-active' : ''}`}
+                aria-pressed={textSize < 0.95}
+                aria-label={t('decrease')}
+                title={t('decrease')}
+                onClick={() => setTextSize((s) => Math.max(0.75, +(s - 0.15).toFixed(2)))}
+                style={{ fontSize: 10 }}
+              >
+                A-
+              </button>
+              <button
+                type="button"
+                className={`gov-text-btn ${Math.abs(textSize - 1) < 0.05 ? 'is-active' : ''}`}
+                aria-pressed={Math.abs(textSize - 1) < 0.05}
+                aria-label={t('normal')}
+                title={t('normal')}
+                onClick={() => setTextSize(1)}
+                style={{ fontSize: 12 }}
+              >
+                A
+              </button>
+              <button
+                type="button"
+                className={`gov-text-btn ${textSize > 1.05 ? 'is-active' : ''}`}
+                aria-pressed={textSize > 1.05}
+                aria-label={t('increase')}
+                title={t('increase')}
+                onClick={() => setTextSize((s) => Math.min(1.75, +(s + 0.15).toFixed(2)))}
+                style={{ fontSize: 14 }}
+              >
+                A+
+              </button>
+            </div>
+            <button
+              type="button"
+              className="gov-modal__close"
+              onClick={closePolicy}
+              aria-label="Close modal"
+            >
+              &times;
+            </button>
+          </div>
         </div>
 
         <div className="gov-modal__layout">
@@ -180,7 +218,7 @@ export default function GovPolicyModal() {
             ))}
           </aside>
 
-          <div className="gov-modal__body">
+          <div className="gov-modal__body policies-dpdpa-content" style={{ '--policy-font-scale': textSize }}>
             {active.content}
           </div>
         </div>

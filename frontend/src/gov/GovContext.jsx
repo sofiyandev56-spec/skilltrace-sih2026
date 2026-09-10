@@ -5,9 +5,21 @@ const GovContext = createContext(null)
 
 export function GovProvider({ children }) {
   const [lang, setLang] = useState(() => localStorage.getItem('skilltrace.lang') || 'en')
-  const [textSize, setTextSize] = useState(() => localStorage.getItem('skilltrace.textSize') || 'normal')
+  const [textSize, setTextSize] = useState(() => {
+    const saved = localStorage.getItem('skilltrace.textSize')
+    if (!saved || isNaN(saved)) return 1
+    return Number(saved)
+  })
   const [contrast, setContrast] = useState(() => localStorage.getItem('skilltrace.contrast') || 'standard')
   const [policyModal, setPolicyModal] = useState({ open: false, tab: 'privacy' })
+
+  // Clean up any stray theme attributes to guarantee exact original styling
+  useEffect(() => {
+    document.documentElement.removeAttribute('data-theme')
+    document.documentElement.style.fontSize = ''
+    document.documentElement.style.removeProperty('--font-scale')
+    localStorage.removeItem('skilltrace.theme')
+  }, [])
 
   // Sync html attributes on change
   useEffect(() => {
@@ -17,7 +29,6 @@ export function GovProvider({ children }) {
 
   useEffect(() => {
     localStorage.setItem('skilltrace.textSize', textSize)
-    document.documentElement.setAttribute('data-text-size', textSize)
   }, [textSize])
 
   useEffect(() => {

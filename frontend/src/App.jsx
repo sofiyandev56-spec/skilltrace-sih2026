@@ -145,14 +145,8 @@ export default function App() {
 
       <GovFooter />
 
-      <div className="gov-tricolor gov-tricolor--bottom" aria-hidden="true">
-        <span className="gov-tricolor__saffron" />
-        <span className="gov-tricolor__white" />
-        <span className="gov-tricolor__green" />
-      </div>
-
-        <GovPolicyModal />
-        <AuthModal />
+      <GovPolicyModal />
+      <AuthModal />
       </div>
     </ToastProvider>
   )

@@ -11,11 +11,8 @@ import { useDismiss } from '../lib/useApi.js'
  * Act, 2016, with WCAG 2.1 Level AA set as the bar by GIGW 3.0. The skip link,
  * text-size steps and high-contrast toggle here are the visible part of that.
  */
-const TEXT_SIZES = [
-  { key: 'small', glyph: 'A', title: 'Decrease text size', titleHi: 'अक्षर आकार घटाएँ' },
-  { key: 'normal', glyph: 'A', title: 'Normal text size', titleHi: 'सामान्य अक्षर आकार' },
-  { key: 'large', glyph: 'A', title: 'Increase text size', titleHi: 'अक्षर आकार बढ़ाएँ' },
-]
+// Text sizes are now handled as a numeric scale for the policy modal
+// instead of a global string toggle.
 
 export default function GovTopbar() {
   const { lang, setLang, textSize, setTextSize, contrast, setContrast, t, openPolicy } = useGov()
@@ -34,7 +31,7 @@ export default function GovTopbar() {
           <div className="gov-topbar__left">
             <button
               type="button"
-              className="gov-topbar__reader"
+              className="gov-topbar__reader sr-only"
               onClick={() => openPolicy('accessibility')}
             >
               {t('screenReader')}
@@ -42,22 +39,26 @@ export default function GovTopbar() {
           </div>
 
           <div className="gov-topbar__right">
-            <div className="gov-text-controls" role="group" aria-label={t('textSize')}>
-              <span className="gov-text-controls__label">{t('textSize')}</span>
-              {TEXT_SIZES.map((size, i) => (
-                <button
-                  key={size.key}
-                  type="button"
-                  className="gov-text-btn"
-                  aria-pressed={textSize === size.key}
-                  aria-label={hi ? size.titleHi : size.title}
-                  title={hi ? size.titleHi : size.title}
-                  onClick={() => setTextSize(size.key)}
-                  style={{ fontSize: 10 + i * 2 }}
-                >
-                  {size.glyph}
-                </button>
-              ))}
+            <div className="gov-lang-switch" role="group" aria-label={t('language')}>
+              <button
+                type="button"
+                className={`gov-lang-btn ${lang === 'en' ? 'is-active' : ''}`}
+                aria-pressed={lang === 'en'}
+                onClick={() => setLang('en')}
+              >
+                English
+              </button>
+              <span className="gov-lang-divider" aria-hidden="true">
+                |
+              </span>
+              <button
+                type="button"
+                className={`gov-lang-btn ${lang === 'hi' ? 'is-active' : ''}`}
+                aria-pressed={lang === 'hi'}
+                onClick={() => setLang('hi')}
+              >
+                हिन्दी
+              </button>
             </div>
 
             <button
@@ -71,28 +72,6 @@ export default function GovTopbar() {
               </span>
               {contrast === 'high' ? t('standardContrast') : t('highContrast')}
             </button>
-
-            <div className="gov-lang-switch" role="group" aria-label={t('language')}>
-              <button
-                type="button"
-                className="gov-lang-btn"
-                aria-pressed={lang === 'en'}
-                onClick={() => setLang('en')}
-              >
-                English
-              </button>
-              <span className="gov-lang-divider" aria-hidden="true">
-                |
-              </span>
-              <button
-                type="button"
-                className="gov-lang-btn"
-                aria-pressed={lang === 'hi'}
-                onClick={() => setLang('hi')}
-              >
-                हिन्दी
-              </button>
-            </div>
 
             {isAuthenticated ? (
               <div className="gov-user-menu-wrap" ref={menuRef}>
@@ -161,6 +140,44 @@ export default function GovTopbar() {
                 {hi ? 'साइन इन' : 'Sign in'}
               </button>
             )}
+
+            {/* Text size controls placed at the very end/last */}
+            <div className="gov-text-controls" role="group" aria-label={t('textSize')}>
+              <span className="gov-text-controls__label">{t('textSize')}</span>
+              <button
+                type="button"
+                className={`gov-text-btn ${textSize < 0.95 ? 'is-active' : ''}`}
+                aria-pressed={textSize < 0.95}
+                aria-label={t('decrease')}
+                title={t('decrease')}
+                onClick={() => setTextSize((s) => Math.max(0.75, +(s - 0.15).toFixed(2)))}
+                style={{ fontSize: 10 }}
+              >
+                A-
+              </button>
+              <button
+                type="button"
+                className={`gov-text-btn ${Math.abs(textSize - 1) < 0.05 ? 'is-active' : ''}`}
+                aria-pressed={Math.abs(textSize - 1) < 0.05}
+                aria-label={t('normal')}
+                title={t('normal')}
+                onClick={() => setTextSize(1)}
+                style={{ fontSize: 12 }}
+              >
+                A
+              </button>
+              <button
+                type="button"
+                className={`gov-text-btn ${textSize > 1.05 ? 'is-active' : ''}`}
+                aria-pressed={textSize > 1.05}
+                aria-label={t('increase')}
+                title={t('increase')}
+                onClick={() => setTextSize((s) => Math.min(1.75, +(s + 0.15).toFixed(2)))}
+                style={{ fontSize: 14 }}
+              >
+                A+
+              </button>
+            </div>
           </div>
         </div>
     </div>
