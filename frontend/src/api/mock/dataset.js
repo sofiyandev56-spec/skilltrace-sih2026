@@ -16,25 +16,14 @@
  */
 
 import { REVIEW_QUESTIONS } from '../../lib/review.js'
+import { organizedData } from './data/organized_data.js'
 
-export const AS_OF = '2026-09-10'
+export const AS_OF = organizedData.as_of ?? '2026-09-10'
 
-export const DISTRICTS = [
-  'Pune', 'Nashik', 'Nagpur', 'Chhatrapati Sambhajinagar', 'Solapur',
-  'Kolhapur', 'Amravati', 'Latur', 'Jalgaon', 'Thane',
-]
+export const DISTRICTS = organizedData.districts
 
 /** Each course trains for one intended job role, with a planned placement target. */
-export const COURSES = [
-  { name: 'Electrician (Level 3)', intended_role: 'Electrician', target_pct: 80 },
-  { name: 'Sewing Machine Operator', intended_role: 'Machine Operator', target_pct: 75 },
-  { name: 'Solar PV Installer', intended_role: 'Solar Technician', target_pct: 70 },
-  { name: 'Retail Sales Associate', intended_role: 'Sales Associate', target_pct: 78 },
-  { name: 'Data Entry Operator', intended_role: 'Data Entry Operator', target_pct: 72 },
-  { name: 'Welder (Gas & Arc)', intended_role: 'Welder', target_pct: 82 },
-  { name: 'CNC Machine Operator', intended_role: 'CNC Operator', target_pct: 76 },
-  { name: 'General Duty Assistant', intended_role: 'Healthcare Assistant', target_pct: 74 },
-]
+export const COURSES = organizedData.courses
 
 /** Roles trainees actually drift into when the placement misses its intended role. */
 const DRIFT_ROLES = [
@@ -580,22 +569,23 @@ export function groupEventsByTrainee(events) {
 
 export function buildDataset() {
   const rng = mulberry32(20260910)
-  const seq = { n: 1 }
 
-  const providers = buildProviders(rng)
-  const trainees = buildTrainees(rng, providers)
+  const trainees = organizedData.trainees
+  const events = organizedData.events
+  const disputes = organizedData.disputes.map((d, i) => ({
+    ...d,
+    record_id: d.record_id ?? `ST-2026-${String(i + 1).padStart(3, '0')}`,
+    assigned_officer_id: d.assigned_officer_id ?? null,
+    assigned_at: d.assigned_at ?? null,
+  }))
+  const consents = organizedData.consents
+  const followupQueue = organizedData.followupQueue
 
-  const events = []
-  for (const t of trainees) {
-    const p = providers.find((x) => x.id === t.provider_id)
-    events.push(...buildEventsFor(t, p, rng, seq))
-  }
+  // Reconstruct rich provider stats from the pre-built data
+  const rawProviders = organizedData.providers
+  const providerStats = buildProviderStats(rawProviders, trainees, events)
 
-  const providerStats = buildProviderStats(providers, trainees, events)
-  const disputes = buildDisputes(rng, trainees, events, seq)
-  const consents = buildConsents(rng, trainees)
-  const followupQueue = buildFollowupQueue(rng, trainees, events)
-  const reviews = buildReviews(rng, trainees, providers)
+  const reviews = buildReviews(rng, trainees, rawProviders)
 
   return {
     providers: providerStats,
