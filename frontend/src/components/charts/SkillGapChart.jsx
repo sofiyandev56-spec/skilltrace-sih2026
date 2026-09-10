@@ -1,6 +1,7 @@
 import {
   Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
+import { BRAND, COMPARISON } from '../../lib/chartTheme.js'
 
 /**
  * What the course was meant to place people into, against where they actually
@@ -17,13 +18,13 @@ export default function SkillGapChart({ courses = [] }) {
   return (
     <ResponsiveContainer width="100%" height={Math.max(260, data.length * 44)}>
       <BarChart data={data} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 4 }} barGap={2}>
-        <CartesianGrid stroke="#eef1f4" horizontal={false} />
+        <CartesianGrid stroke={BRAND.grid} horizontal={false} />
         <XAxis
           type="number"
           domain={[0, 100]}
           tickFormatter={(v) => `${v}%`}
           tickLine={false}
-          axisLine={{ stroke: '#dfe4e9' }}
+          axisLine={{ stroke: BRAND.border }}
         />
         <YAxis type="category" dataKey="short" width={148} tickLine={false} axisLine={false} />
         <Tooltip
@@ -33,8 +34,8 @@ export default function SkillGapChart({ courses = [] }) {
           }
         />
         <Legend wrapperStyle={{ fontSize: 11.5, paddingTop: 8 }} />
-        <Bar dataKey="intended_pct" name="Intended job role (target)" fill="#8a949e" barSize={11} />
-        <Bar dataKey="actual_pct" name="Actual job role (observed)" fill="#b4623a" barSize={11} />
+        <Bar dataKey="intended_pct" name="Intended job role (target)" fill={COMPARISON.target} barSize={11} />
+        <Bar dataKey="actual_pct" name="Actual job role (observed)" fill={COMPARISON.actual} barSize={11} />
       </BarChart>
     </ResponsiveContainer>
   )

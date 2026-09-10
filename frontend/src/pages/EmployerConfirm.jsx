@@ -75,20 +75,13 @@ export default function EmployerConfirm() {
 
   return (
     <div className="pub">
-      <div className="pub__bar">
-        <span
-          aria-hidden="true"
-          style={{ width: 22, height: 22, background: '#b4623a', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700 }}
-        >
-          ST
-        </span>
-        <div>
-          <div style={{ fontWeight: 650 }}>SkillTrace</div>
-          <div style={{ fontSize: 11, color: '#8b9aab' }}>Skill Development Mission — employment confirmation</div>
-        </div>
+      <div className="gov-tricolor" aria-hidden="true">
+        <div className="gov-tricolor__saffron" />
+        <div className="gov-tricolor__white" />
+        <div className="gov-tricolor__green" />
       </div>
 
-      <div className="pub__body">
+      <main className="pub__body" id="main-content" tabIndex={-1}>
         <div className="pub__card">
           {!r ? (
             <div className="pub__section"><div className="skeleton" style={{ height: 160 }} /></div>
@@ -235,7 +228,7 @@ export default function EmployerConfirm() {
           </select>
           <Link className="btn btn--sm" to="/">Exit</Link>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

@@ -1,45 +1,37 @@
+/**
+ * Navigation and page metadata. Labels are i18n keys rather than literal
+ * strings so the whole site frame switches with the language selector.
+ */
 export const NAV = [
   {
-    group: 'Oversight',
+    groupKey: 'navOversight',
     items: [
-      { path: '/', label: 'Dashboard' },
-      { path: '/disputes', label: 'Disputes', badge: 'disputes' },
-      { path: '/follow-up', label: 'Follow-up queue', badge: 'followup' },
+      { path: '/', labelKey: 'navDashboard' },
+      { path: '/disputes', labelKey: 'navDisputes', badge: 'disputes' },
+      { path: '/follow-up', labelKey: 'navFollowup', badge: 'followup' },
     ],
   },
   {
-    group: 'Data collection',
+    groupKey: 'navCollection',
     items: [
-      { path: '/check-in', label: 'Check-in simulator' },
-      { path: '/employer', label: 'Employer confirmation' },
+      { path: '/check-in', labelKey: 'navCheckin' },
+      { path: '/employer', labelKey: 'navEmployer' },
     ],
   },
   {
-    group: 'Trainee rights',
-    items: [{ path: '/consent', label: 'Consent' }],
+    groupKey: 'navRights',
+    items: [
+      { path: '/consent', labelKey: 'navConsent' },
+      { path: '/policies', labelKey: 'navPolicies' },
+    ],
   },
 ]
 
 export const ROUTE_META = {
-  '/': {
-    title: 'Skilling Outcomes Dashboard',
-    desc: 'Verified post-training outcomes. Employment is counted only after 3+ months at the same employer.',
-  },
-  '/disputes': {
-    title: 'Disputed Records',
-    desc: 'Where the employer and the trainee disagree, we hold both claims and record neither as fact.',
-  },
-  '/follow-up': {
-    title: 'Assisted Follow-up Queue',
-    desc: 'Trainees who did not respond after three contact attempts, for field officer assignment.',
-  },
-  '/check-in': {
-    title: 'Check-in Simulator',
-    desc: 'A simulated messaging check-in. The interface is a mockup; the API call it makes is real.',
-    narrow: false,
-  },
-  '/consent': {
-    title: 'Consent Management',
-    desc: 'Every trainee can see what they agreed to and withdraw it at any time, with immediate effect.',
-  },
+  '/': { titleKey: 'titleDashboard', descKey: 'descDashboard', crumbKey: null },
+  '/disputes': { titleKey: 'titleDisputes', descKey: 'descDisputes', crumbKey: 'navDisputes' },
+  '/follow-up': { titleKey: 'titleFollowup', descKey: 'descFollowup', crumbKey: 'navFollowup' },
+  '/check-in': { titleKey: 'titleCheckin', descKey: 'descCheckin', crumbKey: 'navCheckin' },
+  '/consent': { titleKey: 'titleConsent', descKey: 'descConsent', crumbKey: 'navConsent' },
+  '/policies': { titleKey: 'titlePolicies', descKey: 'descPolicies', crumbKey: 'navPolicies' },
 }

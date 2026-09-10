@@ -6,6 +6,7 @@ import { int, longDate, pct } from '../lib/format.js'
 import FilterBar from '../components/FilterBar.jsx'
 import StatCard from '../components/StatCard.jsx'
 import CompositionBar from '../components/CompositionBar.jsx'
+import EvidenceFooter from '../components/EvidenceFooter.jsx'
 import ProviderTable from '../components/ProviderTable.jsx'
 import DistrictGrid from '../components/DistrictGrid.jsx'
 import RetentionChart from '../components/charts/RetentionChart.jsx'
@@ -273,6 +274,7 @@ export default function Dashboard() {
               </div>
               <div className="panel__body">
                 <WageChart rows={d.wage_progression} cohorts={d.cohorts_present} />
+                <EvidenceFooter evidence={d.wage_evidence} what="Wage figures" />
               </div>
             </div>
           </div>
@@ -340,7 +342,10 @@ export default function Dashboard() {
                 {gap.loading && !gap.data ? (
                   <div className="skeleton" style={{ height: 260 }} />
                 ) : (
-                  <SkillGapChart courses={gap.data?.courses || []} />
+                  <>
+                    <SkillGapChart courses={gap.data?.courses || []} />
+                    <EvidenceFooter evidence={gap.data?.evidence} what="Observed job roles" />
+                  </>
                 )}
               </div>
             </div>

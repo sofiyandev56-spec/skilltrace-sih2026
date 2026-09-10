@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { EvidenceBadge } from './Evidence.jsx'
 import { dominantTier } from '../lib/evidence.js'
 import { int } from '../lib/format.js'
+import { MAGNITUDE } from '../lib/chartTheme.js'
 
 const COLUMNS = [
   { key: 'name', label: 'Training centre', align: 'left' },
@@ -92,12 +93,12 @@ export default function ProviderTable({ providers = [], onSelect, activeProvider
                     {p.verified_placement_pct}%
                   </span>
                   <span className="cellbar__track">
+                    {/* Neutral fill — length carries the magnitude. Colouring this
+                        by threshold would reuse a tier colour to mean "above
+                        target", which is not what green means anywhere else. */}
                     <span
                       className="cellbar__fill"
-                      style={{
-                        width: `${p.verified_placement_pct}%`,
-                        background: p.verified_placement_pct >= 50 ? '#1a7a4c' : '#b4623a',
-                      }}
+                      style={{ width: `${p.verified_placement_pct}%`, background: MAGNITUDE }}
                     />
                   </span>
                 </div>

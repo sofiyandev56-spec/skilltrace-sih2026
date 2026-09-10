@@ -173,6 +173,7 @@ export function getDashboard(filters = {}) {
     { months: 6, min: 136, max: 270 },
     { months: 12, min: 271, max: 9999 },
   ]
+  const wageTiers = emptyTiers()
   const wage_progression = buckets.map((b) => {
     const row = { months: b.months, label: b.months === 0 ? 'At placement' : `${b.months} mo` }
     for (const c of cohortsPresent) {
@@ -185,7 +186,10 @@ export function getDashboard(filters = {}) {
           if (!e.salary) continue
           if (e.what_happened !== 'placed' && e.what_happened !== 'still_working') continue
           const d = daysBetween(placement.date, e.date)
-          if (d >= b.min && d <= b.max) salaries.push(e.salary)
+          if (d >= b.min && d <= b.max) {
+            salaries.push(e.salary)
+            wageTiers[e.trust_level] += 1
+          }
         }
       }
       row[c] = salaries.length
@@ -204,6 +208,7 @@ export function getDashboard(filters = {}) {
     outcomes,
     retention,
     wage_progression,
+    wage_evidence: tierPercentages(wageTiers),
     cohorts_present: cohortsPresent,
     evidence_totals: tierPercentages(overallTiers),
     consent: data.consentTotals,
@@ -279,6 +284,7 @@ export function getSkillGap(filters = {}) {
   const data = store.currentData()
   const cohort = applyFilters(data.trainees, filters)
 
+  const gapTiers = emptyTiers()
   const courses = COURSES.map((def) => {
     const own = cohort.filter((t) => t.course === def.name)
     let working = 0
@@ -287,6 +293,7 @@ export function getSkillGap(filters = {}) {
       const c = classify(data.eventsByTrainee[t.id])
       if (!['employed', 'awaiting_confirmation', 'apprentice', 'self_employed'].includes(c.bucket)) continue
       working += 1
+      gapTiers[c.trust] += 1
       const role = c.event?.job_role || ''
       if (role === def.intended_role || role === `Apprentice — ${def.intended_role}` || role === `Self-employed — ${def.intended_role}`) {
         onRole += 1
@@ -325,7 +332,7 @@ export function getSkillGap(filters = {}) {
     }
   })
 
-  return { courses, districts }
+  return { courses, districts, evidence: tierPercentages(gapTiers) }
 }
 
 /* ------------------------------------------------------------------ */

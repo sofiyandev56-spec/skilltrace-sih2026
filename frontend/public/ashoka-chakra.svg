@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" aria-label="Ashoka Chakra">
+  <g fill="#000080" stroke="#000080">
+    <circle cx="100" cy="100" r="90" fill="none" stroke="#000080" stroke-width="4"/>
+    <circle cx="100" cy="100" r="82" fill="none" stroke="#000080" stroke-width="2"/>
+    <circle cx="100" cy="100" r="20" fill="none" stroke="#000080" stroke-width="3"/>
+    <circle cx="100" cy="100" r="8" fill="#000080"/>
+    <line x1="120.00" y1="100.00" x2="182.00" y2="100.00" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="179.32,110.44 187.67,107.67 186.66,115.28" fill="#000080" stroke="none"/>
+    <line x1="119.32" y1="105.18" x2="179.21" y2="121.22" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="173.91,130.61 182.69,130.10 179.76,137.19" fill="#000080" stroke="none"/>
+    <line x1="117.32" y1="110.00" x2="171.01" y2="141.00" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="163.47,148.70 172.09,150.47 167.41,156.57" fill="#000080" stroke="none"/>
+    <line x1="114.14" y1="114.14" x2="157.98" y2="157.98" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="148.70,163.47 156.57,167.41 150.47,172.09" fill="#000080" stroke="none"/>
+    <line x1="110.00" y1="117.32" x2="141.00" y2="171.01" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="130.61,173.91 137.19,179.76 130.10,182.69" fill="#000080" stroke="none"/>
+    <line x1="105.18" y1="119.32" x2="121.22" y2="179.21" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="110.44,179.32 115.28,186.66 107.67,187.67" fill="#000080" stroke="none"/>
+    <line x1="100.00" y1="120.00" x2="100.00" y2="182.00" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="89.56,179.32 92.33,187.67 84.72,186.66" fill="#000080" stroke="none"/>
+    <line x1="94.82" y1="119.32" x2="78.78" y2="179.21" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="69.39,173.91 69.90,182.69 62.81,179.76" fill="#000080" stroke="none"/>
+    <line x1="90.00" y1="117.32" x2="59.00" y2="171.01" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="51.30,163.47 49.53,172.09 43.43,167.41" fill="#000080" stroke="none"/>
+    <line x1="85.86" y1="114.14" x2="42.02" y2="157.98" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="36.53,148.70 32.59,156.57 27.91,150.47" fill="#000080" stroke="none"/>
+    <line x1="82.68" y1="110.00" x2="28.99" y2="141.00" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="26.09,130.61 20.24,137.19 17.31,130.10" fill="#000080" stroke="none"/>
+    <line x1="80.68" y1="105.18" x2="20.79" y2="121.22" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="20.68,110.44 13.34,115.28 12.33,107.67" fill="#000080" stroke="none"/>
+    <line x1="80.00" y1="100.00" x2="18.00" y2="100.00" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="20.68,89.56 12.33,92.33 13.34,84.72" fill="#000080" stroke="none"/>
+    <line x1="80.68" y1="94.82" x2="20.79" y2="78.78" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="26.09,69.39 17.31,69.90 20.24,62.81" fill="#000080" stroke="none"/>
+    <line x1="82.68" y1="90.00" x2="28.99" y2="59.00" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="36.53,51.30 27.91,49.53 32.59,43.43" fill="#000080" stroke="none"/>
+    <line x1="85.86" y1="85.86" x2="42.02" y2="42.02" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="51.30,36.53 43.43,32.59 49.53,27.91" fill="#000080" stroke="none"/>
+    <line x1="90.00" y1="82.68" x2="59.00" y2="28.99" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="69.39,26.09 62.81,20.24 69.90,17.31" fill="#000080" stroke="none"/>
+    <line x1="94.82" y1="80.68" x2="78.78" y2="20.79" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="89.56,20.68 84.72,13.34 92.33,12.33" fill="#000080" stroke="none"/>
+    <line x1="100.00" y1="80.00" x2="100.00" y2="18.00" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="110.44,20.68 107.67,12.33 115.28,13.34" fill="#000080" stroke="none"/>
+    <line x1="105.18" y1="80.68" x2="121.22" y2="20.79" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="130.61,26.09 130.10,17.31 137.19,20.24" fill="#000080" stroke="none"/>
+    <line x1="110.00" y1="82.68" x2="141.00" y2="28.99" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="148.70,36.53 150.47,27.91 156.57,32.59" fill="#000080" stroke="none"/>
+    <line x1="114.14" y1="85.86" x2="157.98" y2="42.02" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="163.47,51.30 167.41,43.43 172.09,49.53" fill="#000080" stroke="none"/>
+    <line x1="117.32" y1="90.00" x2="171.01" y2="59.00" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="173.91,69.39 179.76,62.81 182.69,69.90" fill="#000080" stroke="none"/>
+    <line x1="119.32" y1="94.82" x2="179.21" y2="78.78" stroke="#000080" stroke-width="2.4" stroke-linecap="round"/>
+    <polygon points="179.32,89.56 186.66,84.72 187.67,92.33" fill="#000080" stroke="none"/>
+  </g>
+</svg>
