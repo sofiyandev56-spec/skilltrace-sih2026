@@ -1,60 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client.js'
 import { useApi } from '../lib/useApi.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { EvidenceBadge } from '../components/Evidence.jsx'
 import { BUCKET_META } from '../lib/evidence.js'
-
-/**
- * Periodic status check-in.
- *
- * In production this reaches the trainee as an SMS or an automated voice call
- * and comes back as a keypad response; the officer-facing screen here submits
- * the identical payload, so what a field officer records by phone and what a
- * trainee submits themselves are the same record with a different `source`.
- */
-const PRIMARY = [
-  { key: 'employed', label: 'Working for an employer', hint: 'Still in a paid job' },
-  { key: 'self_employed', label: 'Running my own work', hint: 'Self-employed or own business' },
-  { key: 'apprentice', label: 'In an apprenticeship', hint: 'Learning on a stipend' },
-  { key: 'not_working', label: 'Not working right now', hint: 'Between jobs or unavailable' },
-]
-
-/** The second question depends on the first — that is the point of asking it. */
-const FOLLOW_UP = {
-  employed: {
-    question: 'Has your pay changed since you started?',
-    options: [
-      { key: 'same', label: 'About the same' },
-      { key: 'higher', label: 'Higher now' },
-      { key: 'lower', label: 'Lower now' },
-    ],
-  },
-  self_employed: {
-    question: 'Roughly what do you earn in a month?',
-    options: [
-      { key: 'under_10k', label: 'Under ₹10,000' },
-      { key: '10k_20k', label: '₹10,000 – ₹20,000' },
-      { key: 'over_20k', label: 'More than ₹20,000' },
-    ],
-  },
-  apprentice: {
-    question: 'Is the apprenticeship still running?',
-    options: [
-      { key: 'ongoing', label: 'Yes, still ongoing' },
-      { key: 'completed', label: 'Completed it' },
-      { key: 'left', label: 'I left it' },
-    ],
-  },
-  not_working: {
-    question: 'Are you looking for work at the moment?',
-    options: [
-      { key: 'looking', label: 'Yes, looking' },
-      { key: 'not_looking', label: 'Not looking' },
-      { key: 'studying', label: 'Studying or training' },
-    ],
-  },
-}
+import { useGov } from '../gov/GovContext.jsx'
 
 function Choice({ picked, onPick, option }) {
   return (
@@ -74,6 +24,7 @@ function Choice({ picked, onPick, option }) {
 }
 
 export default function CheckIn() {
+  const { t } = useGov()
   const { role, user } = useAuth()
   const people = useApi(() => api.getTrainees({}), [])
   const [traineeId, setTraineeId] = useState('')
@@ -82,6 +33,48 @@ export default function CheckIn() {
   const [state, setState] = useState('idle') // idle | sending | done
   const [payload, setPayload] = useState(null)
   const [result, setResult] = useState(null)
+
+  const PRIMARY = [
+    { key: 'employed', label: t('employed'), hint: t('employedHint') },
+    { key: 'self_employed', label: t('selfEmployedOpt'), hint: t('selfEmployedHint') },
+    { key: 'apprentice', label: t('apprenticeOpt'), hint: t('apprenticeHint') },
+    { key: 'not_working', label: t('notWorkingOpt'), hint: t('notWorkingHint') },
+  ]
+
+  const FOLLOW_UP = {
+    employed: {
+      question: t('fuEmployedQ'),
+      options: [
+        { key: 'same', label: t('fuSame') },
+        { key: 'higher', label: t('fuHigher') },
+        { key: 'lower', label: t('fuLower') },
+      ],
+    },
+    self_employed: {
+      question: t('fuSelfEmployedQ'),
+      options: [
+        { key: 'under_10k', label: t('fuUnder10k') },
+        { key: '10k_20k', label: t('fu10k20k') },
+        { key: 'over_20k', label: t('fuOver20k') },
+      ],
+    },
+    apprentice: {
+      question: t('fuApprenticeQ'),
+      options: [
+        { key: 'ongoing', label: t('fuOngoing') },
+        { key: 'completed', label: t('fuCompleted') },
+        { key: 'left', label: t('fuLeft') },
+      ],
+    },
+    not_working: {
+      question: t('fuNotWorkingQ'),
+      options: [
+        { key: 'looking', label: t('fuLooking') },
+        { key: 'not_looking', label: t('fuNotLooking') },
+        { key: 'studying', label: t('fuStudying') },
+      ],
+    },
+  }
 
   const isOfficer = role === 'government'
   const trainee = useMemo(
@@ -129,22 +122,20 @@ export default function CheckIn() {
   return (
     <div className="stack checkin">
       <div className="note">
-        <b>How this reaches the trainee.</b> A check-in is sent as an SMS or an automated voice call every
-        three months — never through a third-party messaging service. This screen submits the same record so
-        the response can be captured by a field officer, or by the trainee directly.
+        <b>{t('checkinNote')}</b> {t('checkinNoteBody')}
       </div>
 
       <div className="grid grid--2">
         <div className="panel">
           <div className="panel__head">
             <div>
-              <div className="panel__title">Status check-in</div>
-              <div className="panel__hint">Two questions. Nothing else is asked.</div>
+              <div className="panel__title">{t('statusCheckin')}</div>
+              <div className="panel__hint">{t('twoQuestions')}</div>
             </div>
             {state === 'done' ? (
               <div className="panel__right">
                 <button type="button" className="btn btn--sm" onClick={reset}>
-                  Record another
+                  {t('recordAnother')}
                 </button>
               </div>
             ) : null}
@@ -153,7 +144,7 @@ export default function CheckIn() {
           <div className="panel__body stack" style={{ gap: 20 }}>
             {isOfficer && (
               <label className="field">
-                <span className="label">Recording on behalf of</span>
+                <span className="label">{t('recordingOnBehalf')}</span>
                 <select
                   value={traineeId}
                   onChange={(e) => {
@@ -177,12 +168,14 @@ export default function CheckIn() {
                   ✓
                 </div>
                 <div>
-                  <h3>Check-in recorded</h3>
+                  <h3>{t('checkinRecorded')}</h3>
                   <p className="muted small">
-                    Recorded as <b>{result?.event?.what_happened}</b> on {result?.event?.date}. Because it came
-                    from {isOfficer ? 'a field officer' : 'the trainee directly'}, it is stored as{' '}
-                    <b>{isOfficer ? 'corroborated' : 'self-reported'}</b> until an employer or bank record
-                    confirms it.
+                    {t('recordedAs')} <b>{result?.event?.what_happened}</b> {t('on')} {result?.event?.date}.{' '}
+                    {t(
+                      'storedAs',
+                      isOfficer ? t('fromFieldOfficer') : t('fromTrainee'),
+                      isOfficer ? t('corroborated') : t('selfReported'),
+                    )}
                   </p>
                   <div style={{ marginTop: 10 }}>
                     <EvidenceBadge trust={result?.event?.trust_level || 'low'} />
@@ -195,8 +188,8 @@ export default function CheckIn() {
                   <legend className="fieldset__legend">
                     <span className="fieldset__step">1</span>
                     {trainee?.employer
-                      ? `Are you still working at ${trainee.employer}?`
-                      : 'What are you doing for work at the moment?'}
+                      ? t('question1employer', trainee.employer)
+                      : t('question1general')}
                   </legend>
                   <div className="stack" style={{ gap: 8 }}>
                     {PRIMARY.map((o) => (
@@ -238,7 +231,7 @@ export default function CheckIn() {
                   disabled={!primary || !detail || state === 'sending'}
                   onClick={submit}
                 >
-                  {state === 'sending' ? 'Submitting…' : 'Submit check-in'}
+                  {state === 'sending' ? t('submitting') : t('submitCheckin')}
                 </button>
               </>
             )}
@@ -248,7 +241,7 @@ export default function CheckIn() {
         <div className="stack">
           <div className="panel">
             <div className="panel__head">
-              <div className="panel__title">Request</div>
+              <div className="panel__title">{t('request')}</div>
             </div>
             <div className="panel__body">
               {payload ? (
@@ -257,14 +250,14 @@ export default function CheckIn() {
 ${JSON.stringify(payload, null, 2)}`}
                 </pre>
               ) : (
-                <p className="muted small">Nothing sent yet — answer both questions.</p>
+                <p className="muted small">{t('nothingSentYet')}</p>
               )}
             </div>
           </div>
 
           <div className="panel">
             <div className="panel__head">
-              <div className="panel__title">Response</div>
+              <div className="panel__title">{t('response')}</div>
             </div>
             <div className="panel__body">
               {result ? (
@@ -272,7 +265,7 @@ ${JSON.stringify(payload, null, 2)}`}
 {JSON.stringify(result, null, 2)}
                 </pre>
               ) : (
-                <p className="muted small">Waiting for a submission.</p>
+                <p className="muted small">{t('waitingForSubmission')}</p>
               )}
             </div>
           </div>

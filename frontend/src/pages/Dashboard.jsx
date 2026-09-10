@@ -17,6 +17,7 @@ import DistrictGrid from '../components/DistrictGrid.jsx'
 import RetentionChart from '../components/charts/RetentionChart.jsx'
 import WageChart from '../components/charts/WageChart.jsx'
 import SkillGapChart from '../components/charts/SkillGapChart.jsx'
+import { useGov } from '../gov/GovContext.jsx'
 
 const SNAP_KEY = 'skilltrace.snapshot.'
 
@@ -47,6 +48,7 @@ function writeSnapshot(key, snap) {
 }
 
 export default function Dashboard() {
+  const { t } = useGov()
   const [filters, setFilters] = useState({})
   const [nonce, setNonce] = useState(0)
   const [externalChange, setExternalChange] = useState(null)
@@ -120,7 +122,7 @@ export default function Dashboard() {
   const loading = dash.loading && !d
 
   const cohortLabel =
-    [filters.cohort, filters.course, filters.district].filter(Boolean).join(' · ') || 'All cohorts'
+    [filters.cohort, filters.course, filters.district].filter(Boolean).join(' · ') || t('allCohorts')
 
   const [evidenceOpen, setEvidenceOpen] = useState(false)
   const navigate = useNavigate()
@@ -129,14 +131,13 @@ export default function Dashboard() {
     <div className="stack">
       {externalChange && (
         <div className="livebanner" role="status">
-          <strong>Underlying data changed.</strong>
+          <strong>{t('underlyingDataChanged')}</strong>
           <span>
-            A consent record was {externalChange.reason === 'consent_granted' ? 'restored' : 'withdrawn'}.
-            These figures are now out of date.
+            {externalChange.reason === 'consent_granted' ? t('consentRestoredMsg') : t('consentWithdrawnMsg')}
           </span>
           <span className="spacer" />
           <button type="button" className="btn btn--sm btn--accent" onClick={refresh}>
-            Refresh figures
+            {t('refreshFigures')}
           </button>
         </div>
       )}
@@ -155,7 +156,7 @@ export default function Dashboard() {
           ))}
         </div>
       ) : !d ? (
-        <div className="panel"><div className="empty">Could not load dashboard figures.</div></div>
+        <div className="panel"><div className="empty">{t('couldNotLoad')}</div></div>
       ) : (
         <>
           {/* The contrast the whole system exists to expose. */}
@@ -168,10 +169,9 @@ export default function Dashboard() {
           <div className="panel">
             <div className="panel__head">
               <div>
-                <div className="panel__title">What needs attention</div>
+                <div className="panel__title">{t('whatNeedsAttention')}</div>
                 <div className="panel__hint">
-                  Ranked by how much of an officer&rsquo;s time they are worth. Centres with fewer
-                  than 40 trainees in this slice are excluded — too small to draw a conclusion from.
+                  {t('whatNeedsAttentionHint')}
                 </div>
               </div>
             </div>
@@ -184,33 +184,34 @@ export default function Dashboard() {
             <span className="privacy__icon" aria-hidden="true">🔒</span>
             <p className="privacy__text">
               <strong>
-                {int(d.consent.included)} of {int(d.consent.total)} records included.
+                {t('privacyIncluded', int(d.consent.included), int(d.consent.total))}
               </strong>{' '}
               {d.consent.withdrawn > 0 ? (
                 <>
-                  <b className="num">{d.consent.withdrawn}</b> trainee
-                  {d.consent.withdrawn === 1 ? ' has' : 's have'} withdrawn consent and{' '}
-                  {d.consent.withdrawn === 1 ? 'is' : 'are'} excluded from every figure above — not
-                  anonymised, not retained in the denominator, removed.
+                  {t(
+                    'privacyWithdrawn',
+                    d.consent.withdrawn,
+                    d.consent.withdrawn === 1 ? t('privacyHas') : t('privacyHave'),
+                    d.consent.withdrawn === 1 ? t('privacyIs') : t('privacyAre'),
+                  )}
                 </>
               ) : (
                 <>
-                  Every trainee counted here has active consent. Withdrawal takes effect on the next
-                  render of this page, with no administrative review.
+                  {t('privacyAllActive')}
                 </>
               )}
             </p>
             <Link className="privacy__link" to="/consent">
-              Consent &amp; data rights →
+              {t('consentAndRights')}
             </Link>
           </div>
 
           <div className="panel">
             <div className="panel__head">
               <div>
-                <div className="panel__title">Where this cohort actually is</div>
+                <div className="panel__title">{t('whereThisCohortIs')}</div>
                 <div className="panel__hint">
-                  Full breakdown including outcomes not shown in the cards above.
+                  {t('whereThisCohortIsHint')}
                 </div>
               </div>
             </div>
@@ -222,10 +223,9 @@ export default function Dashboard() {
           <div className="panel">
             <div className="panel__head">
               <div>
-                <div className="panel__title">Where the cohort drops off</div>
+                <div className="panel__title">{t('whereDropsOff')}</div>
                 <div className="panel__hint">
-                  Each stage as a share of everyone certified. The largest fall is where the
-                  programme is actually losing people.
+                  {t('whereDropsOffHint')}
                 </div>
               </div>
             </div>
@@ -239,8 +239,8 @@ export default function Dashboard() {
             <div className="panel">
               <div className="panel__head">
                 <div>
-                  <div className="panel__title">Retention after placement</div>
-                  <div className="panel__hint">Share still at the same employer at each checkpoint.</div>
+                  <div className="panel__title">{t('retentionAfterPlacement')}</div>
+                  <div className="panel__hint">{t('retentionHint')}</div>
                 </div>
               </div>
               <div className="panel__body">
@@ -251,13 +251,13 @@ export default function Dashboard() {
             <div className="panel">
               <div className="panel__head">
                 <div>
-                  <div className="panel__title">Wage progression by cohort</div>
-                  <div className="panel__hint">Average monthly wage from placement onwards.</div>
+                  <div className="panel__title">{t('wageProgressionByCohort')}</div>
+                  <div className="panel__hint">{t('wageProgressionHint')}</div>
                 </div>
               </div>
               <div className="panel__body">
                 <WageChart rows={d.wage_progression} cohorts={d.cohorts_present} />
-                <EvidenceFooter evidence={d.wage_evidence} what="Wage figures" />
+                <EvidenceFooter evidence={d.wage_evidence} what={t('wageFigures')} />
               </div>
             </div>
           </div>
@@ -266,14 +266,14 @@ export default function Dashboard() {
           <div className="panel">
             <div className="panel__head">
               <div>
-                <div className="panel__title">Training centre ranking</div>
+                <div className="panel__title">{t('trainingCentreRanking')}</div>
                 <div className="panel__hint">
-                  Sort by any column. Click a row to filter the whole dashboard to that centre.
+                  {t('trainingCentreRankingHint')}
                 </div>
               </div>
               <div className="panel__right">
                 <span className="faint small num">
-                  {provs.data ? `${provs.data.length} centres` : ''}
+                  {provs.data ? `${provs.data.length} ${t('centres')}` : ''}
                 </span>
               </div>
             </div>
@@ -295,9 +295,9 @@ export default function Dashboard() {
             <div className="panel">
               <div className="panel__head">
                 <div>
-                  <div className="panel__title">Skill gap by district</div>
+                  <div className="panel__title">{t('skillGapByDistrict')}</div>
                   <div className="panel__hint">
-                    Gap between the roles courses train for and the roles trainees land in.
+                    {t('skillGapByDistrictHint')}
                   </div>
                 </div>
               </div>
@@ -317,8 +317,8 @@ export default function Dashboard() {
             <div className="panel">
               <div className="panel__head">
                 <div>
-                  <div className="panel__title">Intended role vs actual role</div>
-                  <div className="panel__hint">Per course, target placement rate against what happened.</div>
+                  <div className="panel__title">{t('intendedVsActual')}</div>
+                  <div className="panel__hint">{t('intendedVsActualHint')}</div>
                 </div>
               </div>
               <div className="panel__body">
@@ -327,7 +327,7 @@ export default function Dashboard() {
                 ) : (
                   <>
                     <SkillGapChart courses={gap.data?.courses || []} />
-                    <EvidenceFooter evidence={gap.data?.evidence} what="Observed job roles" />
+                    <EvidenceFooter evidence={gap.data?.evidence} what={t('observedJobRoles')} />
                   </>
                 )}
               </div>
@@ -338,9 +338,9 @@ export default function Dashboard() {
           <div className="panel">
             <div className="panel__head">
               <div>
-                <div className="panel__title">Training feedback</div>
+                <div className="panel__title">{t('trainingFeedback')}</div>
                 <div className="panel__hint">
-                  What trainees said about the course after finishing it, pooled across this slice.
+                  {t('trainingFeedbackHint')}
                 </div>
               </div>
             </div>
@@ -352,9 +352,9 @@ export default function Dashboard() {
           <EvidenceDrawer
             open={evidenceOpen}
             onClose={() => setEvidenceOpen(false)}
-            title="Verified employment rate"
+            title={t('verifiedEmploymentRate')}
             value={pct(d.outcomes.employed.pct)}
-            definition="A trainee counts as employed only once there is evidence they were still with the same employer three or more months after the placement. A bare placement record is never counted here."
+            definition={t('verifiedEmploymentDef')}
             cohort={cohortLabel}
             population={int(d.total_trainees)}
             evidence={d.outcomes.employed.evidence}

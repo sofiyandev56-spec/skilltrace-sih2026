@@ -2,13 +2,15 @@ import {
   Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { BRAND, COMPARISON } from '../../lib/chartTheme.js'
+import { useGov } from '../../gov/GovContext.jsx'
 
 /**
  * What the course was meant to place people into, against where they actually
  * ended up. The gap between the two bars is the skill mismatch.
  */
 export default function SkillGapChart({ courses = [] }) {
-  if (!courses.length) return <div className="empty">No courses in this slice.</div>
+  const { t } = useGov()
+  if (!courses.length) return <div className="empty">{t('noCoursesInSlice')}</div>
 
   const data = courses.map((c) => ({
     ...c,
@@ -34,9 +36,10 @@ export default function SkillGapChart({ courses = [] }) {
           }
         />
         <Legend wrapperStyle={{ fontSize: 11.5, paddingTop: 8 }} />
-        <Bar dataKey="intended_pct" name="Intended job role (target)" fill={COMPARISON.target} barSize={11} />
-        <Bar dataKey="actual_pct" name="Actual job role (observed)" fill={COMPARISON.actual} barSize={11} />
+        <Bar dataKey="intended_pct" name={t('intendedJobRole')} fill={COMPARISON.target} barSize={11} />
+        <Bar dataKey="actual_pct" name={t('actualJobRole')} fill={COMPARISON.actual} barSize={11} />
       </BarChart>
     </ResponsiveContainer>
   )
 }
+

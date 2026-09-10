@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { useGov } from '../gov/GovContext.jsx'
 
 const ToastCtx = createContext(null)
 
@@ -8,6 +9,7 @@ const ToastCtx = createContext(null)
  * screen reader before it is dismissed.
  */
 export function ToastProvider({ children }) {
+  const { t } = useGov()
   const [toasts, setToasts] = useState([])
 
   const dismiss = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), [])
@@ -37,7 +39,7 @@ export function ToastProvider({ children }) {
               <strong>{t.message}</strong>
               {t.detail ? <span>{t.detail}</span> : null}
             </div>
-            <button type="button" className="toast__close" onClick={() => dismiss(t.id)} aria-label="Dismiss">
+            <button type="button" className="toast__close" onClick={() => dismiss(t.id)} aria-label={t('dismiss') || t('close') || 'Dismiss'}>
               ×
             </button>
           </div>

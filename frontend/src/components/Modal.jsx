@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { useGov } from '../gov/GovContext.jsx'
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -12,6 +13,7 @@ const FOCUSABLE =
  * assistive technology.
  */
 export default function Modal({ open, onClose, title, subtitle, children, footer, labelId = 'modal-title' }) {
+  const { t } = useGov()
   const cardRef = useRef(null)
   const returnTo = useRef(null)
 
@@ -86,7 +88,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
             </h2>
             {subtitle ? <p className="gov-modal__subtitle">{subtitle}</p> : null}
           </div>
-          <button type="button" className="gov-modal__close" onClick={onClose} aria-label="Close dialog">
+          <button type="button" className="gov-modal__close" onClick={onClose} aria-label={t('closeDialog')}>
             ×
           </button>
         </div>

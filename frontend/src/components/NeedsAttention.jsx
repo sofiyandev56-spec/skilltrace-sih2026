@@ -1,4 +1,6 @@
+import React from 'react'
 import { Link } from 'react-router-dom'
+import { useGov } from '../gov/GovContext.jsx'
 
 const DEST = {
   role_mismatch: (f) => `/providers/${f.unit_id}`,
@@ -17,6 +19,8 @@ const DEST = {
  * where two parties actively contradict each other.
  */
 export default function NeedsAttention({ findings, loading }) {
+  const { t } = useGov()
+
   if (loading) {
     return (
       <div className="grid grid--3">
@@ -30,24 +34,39 @@ export default function NeedsAttention({ findings, loading }) {
   if (!findings?.length) {
     return (
       <p className="empty">
-        No follow-up is required for this cohort at this time. Every centre in this slice is inside
-        threshold on role relevance, record freshness and evidence quality.
+        {t('noFollowupRequired')}
       </p>
     )
+  }
+
+  const getHeadline = (f) => {
+    if (f.kind === 'role_mismatch') return t('attRoleMismatchTitle')
+    if (f.kind === 'stale') return t('attStaleTitle')
+    if (f.kind === 'unverified') return t('attUnverifiedTitle')
+    if (f.kind === 'disputes') return t('attDisputesTitle')
+    return f.headline
+  }
+
+  const getAction = (f) => {
+    if (f.kind === 'role_mismatch') return t('attRoleMismatchAction')
+    if (f.kind === 'stale') return t('attStaleAction')
+    if (f.kind === 'unverified') return t('attUnverifiedAction')
+    if (f.kind === 'disputes') return t('attDisputesAction')
+    return f.action
   }
 
   return (
     <div className="grid grid--3 attention">
       {findings.map((f) => (
         <article className={`att att--${f.kind === 'disputes' ? 'urgent' : 'act'}`} key={f.id}>
-          <p className="att__kind">{f.headline}</p>
+          <p className="att__kind">{getHeadline(f)}</p>
           <p className="att__unit">
             {f.unit}
             {f.district ? <span className="att__district"> · {f.district}</span> : null}
           </p>
           <p className="att__detail">{f.detail}</p>
           <Link className="att__action" to={DEST[f.kind]?.(f) || '/'}>
-            {f.action} →
+            {getAction(f)} →
           </Link>
         </article>
       ))}

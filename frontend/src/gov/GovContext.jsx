@@ -25,9 +25,15 @@ export function GovProvider({ children }) {
     document.documentElement.setAttribute('data-contrast', contrast)
   }, [contrast])
 
-  const t = (key) => {
+  const t = (key, ...args) => {
     const dict = STRINGS[lang] || STRINGS.en
-    return dict[key] !== undefined ? dict[key] : (STRINGS.en[key] || key)
+    let str = dict[key] !== undefined ? dict[key] : (STRINGS.en[key] || key)
+    if (args.length > 0 && typeof str === 'string') {
+      args.forEach((arg, i) => {
+        str = str.replace(new RegExp(`\\{${i}\\}`, 'g'), arg)
+      })
+    }
+    return str
   }
 
   const openPolicy = (tab = 'privacy') => {

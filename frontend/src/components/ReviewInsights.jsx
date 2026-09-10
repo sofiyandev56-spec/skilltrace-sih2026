@@ -1,5 +1,7 @@
+import React from 'react'
 import { EvidenceBadge } from './Evidence.jsx'
 import { int } from '../lib/format.js'
+import { useGov } from '../gov/GovContext.jsx'
 
 /**
  * Aggregate post-training feedback for the oversight view.
@@ -21,12 +23,14 @@ function Meter({ value }) {
 }
 
 export default function ReviewInsights({ data, loading }) {
+  const { t } = useGov()
+
   if (loading && !data) return <div className="skeleton" style={{ height: 190 }} />
   if (!data || !data.responses) {
     return (
       <div className="empty">
-        <h4>No feedback in this slice</h4>
-        <p>No trainee matching these filters has completed a training review yet.</p>
+        <h4>{t('noFeedbackTitle')}</h4>
+        <p>{t('noFeedbackBody')}</p>
       </div>
     )
   }
@@ -47,48 +51,45 @@ export default function ReviewInsights({ data, loading }) {
           </div>
         ))}
         <div className="rate rate--accent">
-          <span className="rate__label">Recommendation rate</span>
+          <span className="rate__label">{t('recommendationRate')}</span>
           <span className="rate__value num">
             {data.recommend_rate ?? '—'}
             <small>%</small>
           </span>
-          <span className="rate__foot">said definitely or probably</span>
+          <span className="rate__foot">{t('saidDefinitely')}</span>
         </div>
       </div>
 
       <div className="rate__meta">
         <EvidenceBadge trust="low" small />
         <span className="small muted">
-          <b className="num">{int(data.responses)}</b> responses from{' '}
-          <b className="num">{int(data.eligible)}</b> trainees ({data.response_rate}% response rate).
-          Opinions, not outcomes — these cannot be independently verified and are never attributed to a
-          named trainee.
+          {t('responsesFrom', int(data.responses), int(data.eligible), data.response_rate)}
         </span>
       </div>
 
       {data.providers.length > 1 && (
         <div className="ratecentres">
           <div>
-            <span className="label">Best rated centre</span>
+            <span className="label">{t('bestRated')}</span>
             <div className="ratecentres__row">
               <b>{data.providers[0].name}</b>
               <span className="num">{data.providers[0].out_of_five}/5</span>
             </div>
             <span className="faint small">
-              {data.providers[0].district} · {data.providers[0].responses} responses
+              {data.providers[0].district} · {data.providers[0].responses} {t('responses')}
             </span>
           </div>
           {worst && (
             <div>
               <span className="label" style={{ color: 'var(--accent-dark)' }}>
-                Lowest rated centre
+                {t('lowestRated')}
               </span>
               <div className="ratecentres__row">
                 <b>{worst.name}</b>
                 <span className="num">{worst.out_of_five}/5</span>
               </div>
               <span className="faint small">
-                {worst.district} · {worst.responses} responses
+                {worst.district} · {worst.responses} {t('responses')}
               </span>
             </div>
           )}

@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { api } from '../api/client.js'
 import { useApi } from '../lib/useApi.js'
 import { useToast } from './Toast.jsx'
 import { REVIEW_QUESTIONS } from '../lib/review.js'
 import { longDate } from '../lib/format.js'
+import { useGov } from '../gov/GovContext.jsx'
 
 const TOTAL = REVIEW_QUESTIONS.length
 
@@ -20,6 +21,7 @@ const TOTAL = REVIEW_QUESTIONS.length
  * all behave the way the trainee's device has taught them to.
  */
 export default function QuickReview({ traineeId, courseName }) {
+  const { t, lang } = useGov()
   const toast = useToast()
   const [step, setStep] = useState(0) // 0..TOTAL-1 = questions, TOTAL = comment & submit
   const [answers, setAnswers] = useState({})
@@ -44,10 +46,9 @@ export default function QuickReview({ traineeId, courseName }) {
           ✓
         </span>
         <div>
-          <h3 id="review-done-title">Training review completed</h3>
+          <h3 id="review-done-title">{t('trainingReviewCompleted')}</h3>
           <p className="muted small">
-            Thank you — your feedback helps improve training for the next batch. Submitted{' '}
-            {longDate(state.data.review?.submitted_at)}.
+            {t('thankYouFeedback', longDate(state.data.review?.submitted_at))}
           </p>
         </div>
       </section>
@@ -62,10 +63,9 @@ export default function QuickReview({ traineeId, courseName }) {
           ✓
         </span>
         <div>
-          <h3 id="review-thanks-title">Thank you</h3>
+          <h3 id="review-thanks-title">{t('thankYou')}</h3>
           <p className="muted small">
-            Your review has been recorded. It is combined with other trainees’ responses before any government
-            officer sees it — your individual answers are never shown against your name.
+            {t('reviewRecorded')}
           </p>
         </div>
       </section>
@@ -82,21 +82,26 @@ export default function QuickReview({ traineeId, courseName }) {
     await api.submitReview({ trainee_id: traineeId, answers, comment: comment.trim() || null })
     setSubmitting(false)
     setJustDone(true)
-    toast.push('Review submitted', { detail: 'Thank you for helping improve future training.' })
+    toast.push(t('reviewSubmitted'), { detail: t('reviewSubmittedDetail') })
   }
+
+  const promptText = question
+    ? (lang === 'hi' && question.promptHi ? question.promptHi : question.prompt)
+    : null
+
+  const optionLabel = (o) => (lang === 'hi' && o.labelHi ? o.labelHi : o.label)
 
   return (
     <section className="review" aria-labelledby="review-title">
       <header className="review__head">
         <div>
-          <h3 id="review-title">Quick review</h3>
+          <h3 id="review-title">{t('quickReview')}</h3>
           <p className="muted small">
-            Help us improve {courseName ? <b>{courseName}</b> : 'this training'} — about one minute, five
-            questions.
+            {t('quickReviewHelp', courseName ? courseName : t('thisTraining'))}
           </p>
         </div>
         <span className="review__count num" aria-live="polite">
-          {onComment ? 'Last step' : `Question ${step + 1} of ${TOTAL}`}
+          {onComment ? t('lastStep') : t('questionOf', step + 1, TOTAL)}
         </span>
       </header>
 
@@ -106,7 +111,7 @@ export default function QuickReview({ traineeId, courseName }) {
         aria-valuenow={progress}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label="Review progress"
+        aria-label={t('reviewProgress')}
       >
         <span style={{ width: `${progress}%` }} />
       </div>
@@ -114,7 +119,7 @@ export default function QuickReview({ traineeId, courseName }) {
       <div className="review__body">
         {question ? (
           <fieldset className="review__q">
-            <legend className="review__prompt">{question.prompt}</legend>
+            <legend className="review__prompt">{promptText}</legend>
             <div className="review__options">
               {question.options.map((o) => (
                 <label
@@ -129,7 +134,7 @@ export default function QuickReview({ traineeId, courseName }) {
                     onChange={() => setAnswers((a) => ({ ...a, [question.id]: o.value }))}
                   />
                   <span className="reviewopt__mark" aria-hidden="true" />
-                  <span className="reviewopt__label">{o.label}</span>
+                  <span className="reviewopt__label">{optionLabel(o)}</span>
                 </label>
               ))}
             </div>
@@ -138,18 +143,18 @@ export default function QuickReview({ traineeId, courseName }) {
           <div className="review__q">
             <label className="field">
               <span className="review__prompt" style={{ marginBottom: 8, display: 'block' }}>
-                Anything else you’d like to tell us? <span className="faint">(optional)</span>
+                {t('anythingElse')} <span className="faint">{t('optional')}</span>
               </span>
               <textarea
                 rows={3}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="Skip this if you’d rather not."
+                placeholder={t('skipIfRather')}
                 maxLength={400}
               />
             </label>
             <p className="faint small" style={{ marginTop: 8 }}>
-              You answered all {TOTAL} questions. You can go back and change any of them before submitting.
+              {t('answeredAll', TOTAL)}
             </p>
           </div>
         )}
@@ -162,7 +167,7 @@ export default function QuickReview({ traineeId, courseName }) {
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0 || submitting}
         >
-          ← Back
+          {t('back')}
         </button>
 
         <span className="review__dots" aria-hidden="true">
@@ -178,7 +183,7 @@ export default function QuickReview({ traineeId, courseName }) {
 
         {onComment ? (
           <button type="button" className="btn btn--accent" onClick={submit} disabled={submitting}>
-            {submitting ? 'Submitting…' : 'Submit review'}
+            {submitting ? t('submittingReview') : t('submitReview')}
           </button>
         ) : (
           <button
@@ -187,7 +192,7 @@ export default function QuickReview({ traineeId, courseName }) {
             onClick={() => setStep((s) => s + 1)}
             disabled={!answered}
           >
-            {step === TOTAL - 1 ? 'Continue' : 'Next →'}
+            {step === TOTAL - 1 ? t('continue') : t('next')}
           </button>
         )}
       </footer>

@@ -1,4 +1,6 @@
+import React from 'react'
 import { int } from '../lib/format.js'
+import { useGov } from '../gov/GovContext.jsx'
 
 /**
  * Certification through to work in the trained occupation.
@@ -9,8 +11,10 @@ import { int } from '../lib/format.js'
  * compute. The drop annotations name where people are actually being lost.
  */
 export default function Funnel({ stages }) {
+  const { t } = useGov()
+
   if (!stages?.length) {
-    return <p className="empty">No cohort data for this filter selection yet.</p>
+    return <p className="empty">{t('noCohortData')}</p>
   }
 
   return (
@@ -23,7 +27,7 @@ export default function Funnel({ stages }) {
             <div key={s.stage}>
               {prev && lost > 0 ? (
                 <p className="funnel__drop">
-                  ↓ {int(lost)} did not reach this stage
+                  {t('didNotReach', int(lost))}
                 </p>
               ) : null}
               <div className="funnel__row">
@@ -44,15 +48,15 @@ export default function Funnel({ stages }) {
       </div>
 
       <details className="datatable">
-        <summary>View this funnel as a table</summary>
+        <summary>{t('viewAsTable')}</summary>
         <div className="tblwrap">
           <table className="tbl">
             <thead>
               <tr>
-                <th scope="col">Stage</th>
-                <th scope="col">Meaning</th>
-                <th scope="col">Trainees</th>
-                <th scope="col">Share of certified</th>
+                <th scope="col">{t('colStage')}</th>
+                <th scope="col">{t('colMeaning')}</th>
+                <th scope="col">{t('trainees')}</th>
+                <th scope="col">{t('colShareCertified')}</th>
               </tr>
             </thead>
             <tbody>

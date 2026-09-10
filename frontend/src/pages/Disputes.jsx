@@ -1,25 +1,17 @@
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { api } from '../api/client.js'
 import { useApi } from '../lib/useApi.js'
 import { useToast } from '../components/Toast.jsx'
 import Modal from '../components/Modal.jsx'
 import { longDate, relativeAge } from '../lib/format.js'
-
-const RESOLUTIONS = [
-  { key: 'employer_stands', label: "Employer's record stands" },
-  { key: 'trainee_stands', label: "Trainee's record stands" },
-  { key: 'field_verification', label: 'Upheld after field verification' },
-]
-const RESOLUTION_LABEL = Object.fromEntries(RESOLUTIONS.map((r) => [r.key, r.label]))
-
-const statusLabel = (d) =>
-  d.status === 'resolved' ? 'Resolved' : d.assigned_officer_id ? 'Under review' : 'Disputed'
+import { useGov } from '../gov/GovContext.jsx'
 
 /* ------------------------------------------------------------------ */
 /* assignment dialog                                                   */
 /* ------------------------------------------------------------------ */
 
 function AssignOfficerModal({ dispute, officers, open, onClose, onAssign, busy }) {
+  const { t } = useGov()
   const [selected, setSelected] = useState(dispute?.assigned_officer_id || '')
   const [query, setQuery] = useState('')
   const [note, setNote] = useState('')
@@ -39,17 +31,20 @@ function AssignOfficerModal({ dispute, officers, open, onClose, onAssign, busy }
   if (!dispute) return null
   const reassigning = Boolean(dispute.assigned_officer_id)
 
+  const statusLabel = (d) =>
+    d.status === 'resolved' ? t('statusResolved') : d.assigned_officer_id ? t('statusUnderReview') : t('statusDisputed')
+
   return (
     <Modal
       open={open}
       onClose={onClose}
       labelId="assign-officer-title"
-      title={reassigning ? 'Change field officer' : 'Assign field officer'}
+      title={reassigning ? t('changeFieldOfficer') : t('assignFieldOfficerTitle')}
       subtitle={`${dispute.record_id} · ${dispute.trainee_name}`}
       footer={
         <>
           <button type="button" className="btn" onClick={onClose} disabled={busy}>
-            Cancel
+            {t('cancel')}
           </button>
           <button
             type="button"
@@ -57,7 +52,7 @@ function AssignOfficerModal({ dispute, officers, open, onClose, onAssign, busy }
             disabled={!selected || busy || selected === dispute.assigned_officer_id}
             onClick={() => onAssign(selected, note)}
           >
-            {busy ? 'Assigning…' : reassigning ? 'Confirm reassignment' : 'Confirm assignment'}
+            {busy ? t('assigning') : reassigning ? t('confirmReassignment') : t('confirmAssignment')}
           </button>
         </>
       }
@@ -65,53 +60,52 @@ function AssignOfficerModal({ dispute, officers, open, onClose, onAssign, busy }
       <section className="assign-case">
         <dl>
           <div>
-            <dt>Record</dt>
+            <dt>{t('record')}</dt>
             <dd className="mono">{dispute.record_id}</dd>
           </div>
           <div>
-            <dt>Trainee</dt>
+            <dt>{t('colTrainee')}</dt>
             <dd>
               {dispute.trainee_name} <span className="faint mono">({dispute.trainee_id})</span>
             </dd>
           </div>
           <div>
-            <dt>Dispute type</dt>
+            <dt>{t('disputeType')}</dt>
             <dd>{dispute.type}</dd>
           </div>
           <div>
-            <dt>Current status</dt>
+            <dt>{t('currentStatus')}</dt>
             <dd>{statusLabel(dispute)}</dd>
           </div>
           <div>
-            <dt>Employer</dt>
+            <dt>{t('employer')}</dt>
             <dd>{dispute.employer}</dd>
           </div>
           <div>
-            <dt>Raised</dt>
+            <dt>{t('raised')}</dt>
             <dd className="num">{longDate(dispute.date)}</dd>
           </div>
         </dl>
       </section>
 
       <p className="small muted" style={{ margin: '16px 0 10px' }}>
-        The officer will visit in person to establish the facts. Assignment does not decide the dispute — the
-        record stays excluded from outcome figures until a reviewer rules on it.
+        {t('assignInstructions')}
       </p>
 
       <label className="field">
-        <span className="label">Find an officer</span>
+        <span className="label">{t('findAnOfficer')}</span>
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name, division or designation"
+          placeholder={t('searchOfficerPlaceholder')}
         />
       </label>
 
-      <div className="officer-list" role="radiogroup" aria-label="Available field officers">
+      <div className="officer-list" role="radiogroup" aria-label={t('findAnOfficer')}>
         {filtered.length === 0 ? (
           <p className="muted small" style={{ padding: '12px 2px' }}>
-            No officer matches “{query}”.
+            {t('noOfficerMatch', query)}
           </p>
         ) : (
           filtered.map((o) => (
@@ -134,16 +128,16 @@ function AssignOfficerModal({ dispute, officers, open, onClose, onAssign, busy }
                 <span className="officer__name">
                   {o.name}
                   {o.id === dispute.assigned_officer_id ? (
-                    <span className="officer__current">Currently assigned</span>
+                    <span className="officer__current">{t('currentlyAssigned')}</span>
                   ) : null}
                 </span>
                 <span className="officer__meta">
-                  {o.designation} · {o.division} division · <span className="mono">{o.id}</span>
+                  {o.designation} · {o.division} {t('division')} · <span className="mono">{o.id}</span>
                 </span>
               </span>
               <span className={`officer__load ${o.active_cases >= 4 ? 'is-heavy' : ''}`}>
                 <span className="num">{o.active_cases}</span>
-                <span>open</span>
+                <span>{t('tabOpen')?.toLowerCase() || 'open'}</span>
               </span>
             </button>
           ))
@@ -151,12 +145,12 @@ function AssignOfficerModal({ dispute, officers, open, onClose, onAssign, busy }
       </div>
 
       <label className="field" style={{ marginTop: 14 }}>
-        <span className="label">Instruction to the officer (optional)</span>
+        <span className="label">{t('instructionLabel')}</span>
         <textarea
           rows={2}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="e.g. Verify attendance register and payslips for Feb–Apr 2026"
+          placeholder={t('instructionPlaceholder')}
         />
       </label>
     </Modal>
@@ -168,21 +162,28 @@ function AssignOfficerModal({ dispute, officers, open, onClose, onAssign, busy }
 /* ------------------------------------------------------------------ */
 
 function ResolveModal({ dispute, open, onClose, onResolve, busy }) {
+  const { t } = useGov()
   const [resolution, setResolution] = useState('')
   const [note, setNote] = useState('')
   if (!dispute) return null
+
+  const RESOLUTIONS = [
+    { key: 'employer_stands', label: t('employerStands') },
+    { key: 'trainee_stands', label: t('traineeStands') },
+    { key: 'field_verification', label: t('upheldField') },
+  ]
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       labelId="resolve-title"
-      title="Record a decision"
+      title={t('recordDecision')}
       subtitle={`${dispute.record_id} · ${dispute.trainee_name}`}
       footer={
         <>
           <button type="button" className="btn" onClick={onClose} disabled={busy}>
-            Cancel
+            {t('cancel')}
           </button>
           <button
             type="button"
@@ -190,13 +191,13 @@ function ResolveModal({ dispute, open, onClose, onResolve, busy }) {
             disabled={!resolution || busy}
             onClick={() => onResolve(resolution, note)}
           >
-            {busy ? 'Saving…' : 'Mark resolved'}
+            {busy ? t('saving') : t('markResolved')}
           </button>
         </>
       }
     >
       <p className="small muted" style={{ marginBottom: 12 }}>
-        A person decides this, not an algorithm. Whichever account stands is recorded against your name.
+        {t('resolutionNote')}
       </p>
       <div className="stack" style={{ gap: 8 }}>
         {RESOLUTIONS.map((r) => (
@@ -213,7 +214,7 @@ function ResolveModal({ dispute, open, onClose, onResolve, busy }) {
         ))}
       </div>
       <label className="field" style={{ marginTop: 14 }}>
-        <span className="label">Reviewer note (optional)</span>
+        <span className="label">{t('reviewerNote')}</span>
         <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
     </Modal>
@@ -225,6 +226,7 @@ function ResolveModal({ dispute, open, onClose, onResolve, busy }) {
 /* ------------------------------------------------------------------ */
 
 export default function Disputes() {
+  const { t, lang } = useGov()
   const [tab, setTab] = useState('open')
   const [expanded, setExpanded] = useState(null)
   const [assignTarget, setAssignTarget] = useState(null)
@@ -242,6 +244,15 @@ export default function Disputes() {
   const shown = tab === 'open' ? open : resolved
   const unassigned = open.filter((d) => !d.assigned_officer_id).length
 
+  const RESOLUTION_LABEL = {
+    employer_stands: t('employerStands'),
+    trainee_stands: t('traineeStands'),
+    field_verification: t('upheldField'),
+  }
+
+  const statusLabel = (d) =>
+    d.status === 'resolved' ? t('statusResolved') : d.assigned_officer_id ? t('statusUnderReview') : t('statusDisputed')
+
   const handleAssign = async (officerId, note) => {
     setBusy(true)
     const res = await api.assignFieldOfficer(assignTarget.id, {
@@ -253,8 +264,8 @@ export default function Disputes() {
     setBusy(false)
     setAssignTarget(null)
     const name = res?.dispute?.officer?.name || officers.find((o) => o.id === officerId)?.name
-    toast.push(`${assignTarget.record_id} assigned to ${name}`, {
-      detail: 'The officer has been notified and the record now shows as under review.',
+    toast.push(`${assignTarget.record_id} → ${name}`, {
+      detail: t('assignInstructions'),
     })
   }
 
@@ -267,17 +278,15 @@ export default function Disputes() {
     })
     await reload()
     setBusy(false)
-    const label = RESOLUTION_LABEL[resolution]
+    const label = RESOLUTION_LABEL[resolution] || resolution
     setResolveTarget(null)
-    toast.push(`${resolveTarget.record_id} resolved`, { detail: label })
+    toast.push(`${resolveTarget.record_id} → ${t('statusResolved')}`, { detail: label })
   }
 
   return (
     <div className="stack">
       <div className="note">
-        <b>We don’t guess.</b> When an employer and a trainee describe the same job differently, SkillTrace
-        holds both statements and excludes the record from outcome figures until a person rules on it. Where
-        the paper trail cannot settle it, assign a field officer to go and look.
+        <b>{t('disputeNoteIntro')}</b> {t('disputeNoteBody')}
       </div>
 
       <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -287,20 +296,19 @@ export default function Disputes() {
             className={`btn btn--sm ${tab === 'open' ? 'btn--primary' : ''}`}
             onClick={() => setTab('open')}
           >
-            Open <span className="num">({open.length})</span>
+            {t('tabOpen')} <span className="num">({open.length})</span>
           </button>
           <button
             type="button"
             className={`btn btn--sm ${tab === 'resolved' ? 'btn--primary' : ''}`}
             onClick={() => setTab('resolved')}
           >
-            Resolved <span className="num">({resolved.length})</span>
+            {t('tabResolved')} <span className="num">({resolved.length})</span>
           </button>
         </div>
         {unassigned > 0 && tab === 'open' ? (
           <span className="small muted">
-            <b className="num">{unassigned}</b> open record{unassigned === 1 ? '' : 's'} without a field
-            officer
+            {t('openRecords', unassigned, unassigned === 1 ? '' : (lang === 'hi' ? '' : 's'))}
           </span>
         ) : null}
       </div>
@@ -310,11 +318,11 @@ export default function Disputes() {
       ) : shown.length === 0 ? (
         <div className="panel">
           <div className="empty">
-            <h4>{tab === 'open' ? 'No open disputes' : 'Nothing resolved yet'}</h4>
+            <h4>{tab === 'open' ? t('noOpenDisputes') : t('nothingResolvedYet')}</h4>
             <p>
               {tab === 'open'
-                ? 'Every conflicting record has been reviewed.'
-                : 'Resolved disputes appear here with the reviewer’s decision.'}
+                ? t('everyConflictReviewed')
+                : t('resolvedAppearsHere')}
             </p>
           </div>
         </div>
@@ -325,12 +333,12 @@ export default function Disputes() {
               <table className="tbl tbl--disputes">
                 <thead>
                   <tr>
-                    <th>Record ID</th>
-                    <th>Trainee</th>
-                    <th>Issue</th>
-                    <th>Status</th>
-                    <th>Field officer</th>
-                    <th className="right">Action</th>
+                    <th>{t('colRecordId')}</th>
+                    <th>{t('colTrainee')}</th>
+                    <th>{t('colIssue')}</th>
+                    <th>{t('colStatus')}</th>
+                    <th>{t('colFieldOfficer')}</th>
+                    <th className="right">{t('colAction')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -366,11 +374,11 @@ export default function Disputes() {
                             <div>
                               <div style={{ fontWeight: 600 }}>{d.officer.name}</div>
                               <div className="faint small">
-                                {d.officer.division} · assigned {longDate(d.assigned_at)}
+                                {d.officer.division} · {t('assignedAt') || 'assigned'} {longDate(d.assigned_at)}
                               </div>
                             </div>
                           ) : (
-                            <span className="faint">Unassigned</span>
+                            <span className="faint">{t('unassigned') || 'Unassigned'}</span>
                           )}
                         </td>
                         <td className="right">
@@ -380,7 +388,7 @@ export default function Disputes() {
                               className={`btn btn--sm ${d.officer ? '' : 'btn--accent'}`}
                               onClick={() => setAssignTarget(d)}
                             >
-                              {d.officer ? 'Change officer' : 'Assign field officer'}
+                              {d.officer ? t('changeOfficer') : t('assignFieldOfficer')}
                             </button>
                             {d.status !== 'resolved' ? (
                               <button
@@ -388,7 +396,7 @@ export default function Disputes() {
                                 className="btn btn--sm btn--primary"
                                 onClick={() => setResolveTarget(d)}
                               >
-                                Resolve
+                                {t('resolve')}
                               </button>
                             ) : null}
                           </div>
@@ -400,14 +408,14 @@ export default function Disputes() {
                             <div className="dispute__claims">
                               <div className="claim claim--employer">
                                 <div className="claim__src">
-                                  <span className="claim__label">Employer says</span>
+                                  <span className="claim__label">{t('employerSays')}</span>
                                   <span className="faint small">{d.employer}</span>
                                 </div>
                                 <p className="claim__text">{d.employer_claim}</p>
                               </div>
                               <div className="claim claim--trainee">
                                 <div className="claim__src">
-                                  <span className="claim__label">Trainee says</span>
+                                  <span className="claim__label">{t('traineeSays')}</span>
                                   <span className="faint small">{d.trainee_name}</span>
                                 </div>
                                 <p className="claim__text">{d.trainee_claim}</p>
@@ -415,12 +423,12 @@ export default function Disputes() {
                             </div>
                             {d.assignment_note ? (
                               <p className="small muted" style={{ padding: '10px 15px 0' }}>
-                                <b>Instruction to officer:</b> {d.assignment_note}
+                                <b>{t('instructionToOfficer')}</b> {d.assignment_note}
                               </p>
                             ) : null}
                             {d.status === 'resolved' ? (
                               <p className="small muted" style={{ padding: '10px 15px 0' }}>
-                                <b>Decision:</b> {RESOLUTION_LABEL[d.resolution] || d.resolution} ·{' '}
+                                <b>{t('decision')}</b> {RESOLUTION_LABEL[d.resolution] || d.resolution} ·{' '}
                                 {longDate(d.resolved_at)} · {d.resolved_by}
                                 {d.note ? ` · “${d.note}”` : ''}
                               </p>

@@ -1,3 +1,4 @@
+import React from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useApi } from '../lib/useApi.js'
@@ -5,6 +6,7 @@ import { int, longDate } from '../lib/format.js'
 import { EvidenceBadge, EvidenceMeter } from '../components/Evidence.jsx'
 import EvidenceFooter from '../components/EvidenceFooter.jsx'
 import { COMPARISON } from '../lib/chartTheme.js'
+import { useGov } from '../gov/GovContext.jsx'
 import {
   Bar,
   BarChart,
@@ -24,38 +26,38 @@ import {
  * curriculum-to-employer alignment problem, not a fraud problem. The copy
  * has to say that without sounding like an accusation.
  */
-function insightFor(p) {
+function insightFor(p, t) {
   if (!p || !p.certified_count) return null
 
   if (p.employment_pct >= 45 && p.role_matched_pct < p.employment_pct * 0.45) {
     return {
       tone: 'saffron',
-      title: 'Employment is strong, but role relevance is low.',
+      title: t('strongButLow'),
       body: `${p.employment_pct}% of certified trainees hold confirmed employment, but only ${p.role_matched_pct}% work in the role they trained for. Review course-to-employer alignment before expanding intake.`,
-      action: 'Create follow-up task',
+      action: t('createFollowup'),
     }
   }
   if (p.stale_pct >= 25) {
     return {
       tone: 'saffron',
-      title: 'Too many records have gone quiet.',
+      title: t('tooManyQuiet'),
       body: `${p.stale_pct}% of this centre's trainees have no reliable signal in the current tracking period. Outcomes here are being measured on a shrinking base.`,
-      action: 'Send to follow-up queue',
+      action: t('sendToFollowup'),
     }
   }
   if (p.verified_pct < 25 && p.employment_pct >= 30) {
     return {
       tone: 'saffron',
-      title: 'Reported outcomes rest mostly on self-reporting.',
+      title: t('restsSelfReport'),
       body: `Only ${p.verified_pct}% of this centre's employment outcomes are independently verified. The centre is not the sole source of its own score, so this figure should not be read as performance.`,
-      action: 'Request employer confirmations',
+      action: t('requestEmployerConfirm'),
     }
   }
   return {
     tone: 'green',
-    title: 'Outcomes here are well evidenced.',
+    title: t('wellEvidenced'),
     body: `${p.verified_pct}% of employment outcomes at this centre are backed by evidence the centre did not produce itself.`,
-    action: 'Download report',
+    action: t('downloadReport'),
   }
 }
 
@@ -76,21 +78,22 @@ function Metric({ label, value, unit, sub, evidence }) {
 }
 
 export default function ProviderDetail() {
+  const { t } = useGov()
   const { id } = useParams()
   const { data, loading } = useApi(() => api.getProvider(id), [id])
 
-  if (loading) return <p className="empty">Loading training centre…</p>
+  if (loading) return <p className="empty">{t('loadingCentre')}</p>
   if (!data)
     return (
       <div className="stack">
-        <p className="empty">No training centre found for {id}.</p>
+        <p className="empty">{t('noCentreFound', id)}</p>
         <Link className="btn" to="/">
-          Back to the dashboard
+          {t('backToDashboard')}
         </Link>
       </div>
     )
 
-  const insight = insightFor(data)
+  const insight = insightFor(data, t)
   const chartData = data.by_course.map((c) => ({
     course: c.course.length > 22 ? `${c.course.slice(0, 20)}…` : c.course,
     fullCourse: c.course,
@@ -105,14 +108,14 @@ export default function ProviderDetail() {
           <div>
             <h2 className="panel__title">{data.name}</h2>
             <p className="panel__desc">
-              {data.district} district · {data.courses.length} course
-              {data.courses.length === 1 ? '' : 's'} · assessed to {longDate(data.as_of)}
+              {data.district} · {data.courses.length} {t('course')?.toLowerCase() || 'course'}
+              {data.courses.length === 1 ? '' : 's'} · {t('assessedTo', longDate(data.as_of))}
             </p>
           </div>
           <div className="row" style={{ gap: 8 }}>
             <span className="pill pill--resolved">{data.status}</span>
             <span className="confidence" title="How much of this centre's reported success is backed by evidence it did not produce itself">
-              Evidence confidence <strong className="num">{data.confidence_score}</strong>
+              {t('evidenceConfidence')} <strong className="num">{data.confidence_score}</strong>
               <small> / 100</small>
             </span>
           </div>
@@ -127,33 +130,33 @@ export default function ProviderDetail() {
         </ul>
 
         <div className="grid grid--6" style={{ padding: '0 18px 18px' }}>
-          <Metric label="Certified" value={int(data.certified_count)} sub="Completed and assessed" />
+          <Metric label={t('certified')} value={int(data.certified_count)} sub={t('completedAndAssessed')} />
           <Metric
-            label="Reported placement"
+            label={t('reportedPlacement')}
             value={data.headline_placement_pct}
             unit="%"
-            sub="Anyone with a placement on record"
+            sub={t('anyoneWithPlacement')}
           />
           <Metric
-            label="Verified employment"
+            label={t('verifiedEmployment')}
             value={data.employment_pct}
             unit="%"
-            sub="3+ months at one employer"
+            sub={t('threeMonthsOneEmployer')}
             evidence={data.evidence}
           />
           <Metric
-            label="Independently verified"
+            label={t('indepVerified')}
             value={data.verified_pct}
             unit="%"
-            sub="Bank or employer record"
+            sub={t('bankOrEmployer')}
           />
           <Metric
-            label="Role-matched"
+            label={t('roleMatched')}
             value={data.role_matched_pct}
             unit="%"
-            sub="In the occupation trained for"
+            sub={t('inOccupationTrained')}
           />
-          <Metric label="Stale" value={data.stale_pct} unit="%" sub="No recent reliable signal" />
+          <Metric label={t('stale')} value={data.stale_pct} unit="%" sub={t('noRecentSignal')} />
         </div>
       </section>
 
@@ -166,7 +169,7 @@ export default function ProviderDetail() {
               {insight.action}
             </Link>
             <Link className="btn" to="/audit">
-              See source events
+              {t('seeSourceEvents')}
             </Link>
           </div>
         </section>
@@ -175,10 +178,9 @@ export default function ProviderDetail() {
       <section className="panel">
         <div className="panel__head">
           <div>
-            <h2 className="panel__title">Employment and role relevance by course</h2>
+            <h2 className="panel__title">{t('employmentRoleRelevance')}</h2>
             <p className="panel__desc">
-              The gap between the two bars is the share of trainees who found work, but not the work
-              the course was designed for.
+              {t('employmentRoleDesc')}
             </p>
           </div>
         </div>
@@ -207,17 +209,17 @@ export default function ProviderDetail() {
         </div>
 
         <details className="datatable">
-          <summary>View this chart as a table</summary>
+          <summary>{t('viewChartAsTable') || 'View this chart as a table'}</summary>
           <div className="tblwrap">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th scope="col">Course</th>
-                  <th scope="col">Intended role</th>
-                  <th scope="col">Certified</th>
-                  <th scope="col">Employment</th>
-                  <th scope="col">Role-matched</th>
-                  <th scope="col">Evidence</th>
+                  <th scope="col">{t('colCourse')}</th>
+                  <th scope="col">{t('colIntendedRole')}</th>
+                  <th scope="col">{t('certified')}</th>
+                  <th scope="col">{t('colEmployment')}</th>
+                  <th scope="col">{t('roleMatched')}</th>
+                  <th scope="col">{t('colEvidence')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -243,10 +245,10 @@ export default function ProviderDetail() {
 
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <Link className="btn" to="/">
-          Back to all centres
+          {t('backToAllCentres')}
         </Link>
         <Link className="btn" to="/audit">
-          View source events
+          {t('seeSourceEvents')}
         </Link>
       </div>
     </div>

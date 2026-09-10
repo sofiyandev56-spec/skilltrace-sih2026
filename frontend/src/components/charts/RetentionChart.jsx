@@ -5,9 +5,11 @@ import { EvidenceBadge } from '../Evidence.jsx'
 import { dominantTier } from '../../lib/evidence.js'
 import { pct } from '../../lib/format.js'
 import { BRAND } from '../../lib/chartTheme.js'
+import { useGov } from '../../gov/GovContext.jsx'
 
 /** % of placed trainees still at the same employer at each checkpoint. */
 export default function RetentionChart({ retention = [] }) {
+  const { t } = useGov()
   const data = retention.map((r) => ({ ...r, name: r.checkpoint }))
 
   return (
@@ -26,8 +28,8 @@ export default function RetentionChart({ retention = [] }) {
           <ReferenceLine y={50} stroke={BRAND.border} strokeDasharray="3 3" />
           <Tooltip
             formatter={(v, _n, p) => [
-              `${pct(v)} — ${p.payload.retained} of ${p.payload.eligible} placements`,
-              'Still at same employer',
+              t('placementsRatio', pct(v), p.payload.retained, p.payload.eligible),
+              t('stillAtSameEmployer'),
             ]}
           />
           <Line
@@ -48,7 +50,7 @@ export default function RetentionChart({ retention = [] }) {
             <div className="label">{r.checkpoint}</div>
             {r.pct === null ? (
               <div className="muted small" style={{ marginTop: 2 }}>
-                Checkpoint not yet due
+                {t('checkpointNotDue')}
               </div>
             ) : (
               <>
@@ -65,3 +67,4 @@ export default function RetentionChart({ retention = [] }) {
     </div>
   )
 }
+

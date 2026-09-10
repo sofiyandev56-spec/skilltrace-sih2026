@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useApi } from '../lib/useApi.js'
 import { int, longDate, pct } from '../lib/format.js'
 import { BUCKET_META } from '../lib/evidence.js'
+import { useGov } from '../gov/GovContext.jsx'
 
 /** Snapshot of the figures a withdrawal is about to move. */
 async function figures() {
@@ -17,6 +18,7 @@ async function figures() {
 }
 
 export default function Consent() {
+  const { t, lang } = useGov()
   const navigate = useNavigate()
   const [traineeId, setTraineeId] = useState('')
   const [step, setStep] = useState('idle') // idle | confirming | working | done
@@ -62,7 +64,7 @@ export default function Consent() {
   return (
     <div className="stack" style={{ maxWidth: 860 }}>
       <label className="field" style={{ maxWidth: 420 }}>
-        <span className="label">Viewing consent record for</span>
+        <span className="label">{t('viewingConsentFor')}</span>
         <select value={traineeId} onChange={(e) => { setTraineeId(e.target.value); setStep('idle') }}>
           {options.map((p) => (
             <option key={p.id} value={p.id}>
@@ -83,11 +85,11 @@ export default function Consent() {
               <span className="mono" style={{ color: '#8b9aab' }}>{c.trainee_id}</span>
             </p>
             <div className={`consent-status consent-status--${withdrawn ? 'withdrawn' : 'granted'}`}>
-              {withdrawn ? '✕ Consent withdrawn' : '✓ Consent granted'}
+              {withdrawn ? t('consentWithdrawnLabel') : t('consentGranted')}
               <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>
                 {withdrawn
-                  ? `on ${longDate(c.withdrawn_date)}`
-                  : `on ${longDate(c.granted_date)}`}
+                  ? ` ${t('on')} ${longDate(c.withdrawn_date)}`
+                  : ` ${t('on')} ${longDate(c.granted_date)}`}
               </span>
             </div>
           </div>
@@ -95,11 +97,11 @@ export default function Consent() {
           <div className="panel">
             <div className="panel__head">
               <div>
-                <div className="panel__title">What you agreed to</div>
+                <div className="panel__title">{t('whatYouAgreed')}</div>
                 <div className="panel__hint">
                   {withdrawn
-                    ? 'None of this is happening any more. Your record has been removed from all reporting.'
-                    : 'You can withdraw any of this at any time. Withdrawal takes effect immediately.'}
+                    ? t('noneHappening')
+                    : t('canWithdrawAnytime')}
                 </div>
               </div>
             </div>
@@ -120,28 +122,28 @@ export default function Consent() {
           <div className="panel">
             <div className="panel__head">
               <div>
-                <div className="panel__title">What is held about you today</div>
-                <div className="panel__hint">Exactly what withdrawal removes.</div>
+                <div className="panel__title">{t('whatIsHeld')}</div>
+                <div className="panel__hint">{t('exactlyWhatRemoves')}</div>
               </div>
             </div>
             <div className="panel__body">
               <div className="impact" style={{ margin: 0 }}>
                 <div className="impact__cell">
-                  <div className="label">Outcome records</div>
+                  <div className="label">{t('outcomeRecords')}</div>
                   <div className="impact__val num">{c.impact.events}</div>
                 </div>
                 <div className="impact__cell">
-                  <div className="label">Counted as</div>
+                  <div className="label">{t('countedAs')}</div>
                   <div className="impact__val" style={{ fontSize: 15 }}>
                     {BUCKET_META[c.impact.outcome]?.label || c.impact.outcome}
                   </div>
                 </div>
                 <div className="impact__cell">
-                  <div className="label">Open disputes</div>
+                  <div className="label">{t('openDisputes')}</div>
                   <div className="impact__val num">{c.impact.disputes}</div>
                 </div>
                 <div className="impact__cell">
-                  <div className="label">Reported under</div>
+                  <div className="label">{t('reportedUnder')}</div>
                   <div className="impact__val" style={{ fontSize: 15 }}>{c.impact.district}</div>
                 </div>
               </div>
@@ -153,24 +155,26 @@ export default function Consent() {
               <div className="panel__body">
                 <div className="row" style={{ justifyContent: 'space-between' }}>
                   <div>
-                    <div style={{ fontWeight: 650 }}>This record is excluded from all government reporting.</div>
+                    <div style={{ fontWeight: 650 }}>{t('excludedFromAll')}</div>
                     <div className="small muted" style={{ marginTop: 3 }}>
-                      Withdrawn {longDate(c.withdrawn_date)}. Restoring is available here for demonstration.
+                      {t('withdrawnOn', longDate(c.withdrawn_date))}
                     </div>
                   </div>
                   <button type="button" className="btn" onClick={doRestore}>
-                    Restore consent (demo)
+                    {t('restoreConsent')}
                   </button>
                 </div>
               </div>
             </div>
           ) : (
             <div className="withdraw-zone">
-              <h3>Withdraw consent</h3>
+              <h3>{t('withdrawConsent')}</h3>
               <p>
-                Your {c.impact.events} outcome record{c.impact.events === 1 ? '' : 's'} will be removed from
-                every government dashboard, ranking and report immediately. No further check-ins will be sent
-                to you. Your training certificate is not affected.
+                {t(
+                  'withdrawExplanation',
+                  c.impact.events,
+                  c.impact.events === 1 ? '' : (lang === 'hi' ? '' : 's'),
+                )}
               </p>
 
               {step === 'confirming' ? (
@@ -180,10 +184,10 @@ export default function Consent() {
                     className="btn btn--lg btn--danger"
                     onClick={doWithdraw}
                   >
-                    Yes, withdraw my consent now
+                    {t('yesWithdraw')}
                   </button>
                   <button type="button" className="btn btn--lg" onClick={() => setStep('idle')}>
-                    Cancel
+                    {t('cancel')}
                   </button>
                 </div>
               ) : (
@@ -194,7 +198,7 @@ export default function Consent() {
                   disabled={step === 'working'}
                   onClick={() => setStep('confirming')}
                 >
-                  {step === 'working' ? 'Withdrawing…' : 'Withdraw Consent'}
+                  {step === 'working' ? t('withdrawing') : t('withdrawConsent')}
                 </button>
               )}
             </div>
@@ -206,30 +210,30 @@ export default function Consent() {
         <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="wd-title">
           <div className="overlay__card">
             <div className="overlay__top">
-              <h3 id="wd-title">Consent withdrawn</h3>
-              <p>{receipt.name}’s data was removed from every figure the moment you confirmed.</p>
+              <h3 id="wd-title">{t('consentWithdrawnTitle')}</h3>
+              <p>{t('dataRemovedMsg', receipt.name)}</p>
             </div>
             <div className="overlay__body">
               <div className="receipt">
                 <div>
-                  <span>Request</span>
+                  <span>{t('requestLabel')}</span>
                   <b>DELETE /consent/{receipt.res.consent_id || receipt.res.id || '—'}</b>
                 </div>
                 <div>
-                  <span>Status</span>
+                  <span>{t('statusLabel')}</span>
                   <b style={{ color: '#146c43' }}>200 · withdrawn</b>
                 </div>
                 <div>
-                  <span>Records removed</span>
-                  <b>{int(receipt.before.total - receipt.after.total)} trainee</b>
+                  <span>{t('recordsRemoved')}</span>
+                  <b>{int(receipt.before.total - receipt.after.total)} {t('trainees')}</b>
                 </div>
               </div>
 
               <div style={{ marginTop: 16 }}>
-                <div className="label" style={{ marginBottom: 8 }}>Dashboard figures, before → after</div>
+                <div className="label" style={{ marginBottom: 8 }}>{t('dashboardBefore')}</div>
                 <div className="impact" style={{ marginTop: 0 }}>
                   <div className="impact__cell">
-                    <div className="label">Total trainees</div>
+                    <div className="label">{t('totalTrainees')}</div>
                     <div className="row" style={{ gap: 7 }}>
                       <span className="num faint" style={{ textDecoration: 'line-through' }}>
                         {int(receipt.before.total)}
@@ -241,7 +245,7 @@ export default function Consent() {
                     </div>
                   </div>
                   <div className="impact__cell">
-                    <div className="label">Employed</div>
+                    <div className="label">{t('employedLabel')}</div>
                     <div className="row" style={{ gap: 7 }}>
                       <span className="num faint" style={{ textDecoration: 'line-through' }}>
                         {pct(receipt.before.employed_pct)}
@@ -254,16 +258,16 @@ export default function Consent() {
                   </div>
                 </div>
                 <p className="small muted" style={{ marginTop: 10 }}>
-                  Any dashboard already open in another tab will show a notice to refresh.
+                  {t('dashboardRefreshNotice')}
                 </p>
               </div>
             </div>
             <div className="overlay__foot">
               <button type="button" className="btn" onClick={() => setStep('idle')}>
-                Stay on this page
+                {t('stayOnPage')}
               </button>
               <button type="button" className="btn btn--primary" onClick={() => navigate('/')}>
-                Open the dashboard
+                {t('openDashboard')}
               </button>
             </div>
           </div>

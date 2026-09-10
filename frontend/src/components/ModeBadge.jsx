@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { getMode, onModeChange } from '../api/client.js'
+import { useGov } from '../gov/GovContext.jsx'
 
 /**
  * Says out loud whether the figures on screen came from the backend or from
  * the local mock store. A demo should never leave that ambiguous.
  */
 export default function ModeBadge() {
+  const { t } = useGov()
   const [state, setState] = useState(getMode)
   useEffect(() => onModeChange(setState), [])
 
@@ -13,7 +15,7 @@ export default function ModeBadge() {
     return (
       <span className="mode">
         <i className="mode__dot" aria-hidden="true" />
-        Connecting…
+        {t('connecting')}
       </span>
     )
   }
@@ -30,7 +32,7 @@ export default function ModeBadge() {
       }
     >
       <i className="mode__dot" aria-hidden="true" />
-      {live ? 'Live API' : 'Mock data'}
+      {live ? t('liveApi') : t('mockData')}
     </span>
   )
 }

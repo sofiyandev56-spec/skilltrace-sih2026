@@ -1,24 +1,16 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { api } from '../api/client.js'
 import { useApi } from '../lib/useApi.js'
 import { EvidenceBadge } from '../components/Evidence.jsx'
 import Modal from '../components/Modal.jsx'
 import { longDate } from '../lib/format.js'
+import { useGov } from '../gov/GovContext.jsx'
 
 const SOURCE_ICON = {
   bank: '₹',
   employer: '🏢',
   trainee: '👤',
   field_officer: '🧭',
-}
-
-const WHAT_LABEL = {
-  placed: 'Placement reported',
-  still_working: 'Still working confirmed',
-  left_job: 'Left the job',
-  self_employed: 'Self-employment reported',
-  apprentice: 'Apprenticeship reported',
-  not_working: 'Not working reported',
 }
 
 /**
@@ -30,16 +22,30 @@ const WHAT_LABEL = {
  * headline figure look better.
  */
 function TraineeLedger({ traineeId, currentEventId }) {
+  const { t, lang } = useGov()
   const { data, loading } = useApi(() => api.getTrainee(traineeId), [traineeId])
-  if (loading) return <p className="small muted">Loading this trainee&rsquo;s full history…</p>
+  if (loading) return <p className="small muted">{t('loading')}</p>
   const events = data?.events || []
   if (!events.length) return null
+
+  const WHAT_LABEL = {
+    placed: t('whatPlaced'),
+    still_working: t('whatStillWorking'),
+    left_job: t('whatLeftJob'),
+    self_employed: t('whatSelfEmployed'),
+    apprentice: t('whatApprentice'),
+    not_working: t('whatNotWorking'),
+  }
 
   return (
     <div className="ledger">
       <p className="ledger__head">
-        Full record for {traineeId} — {events.length} event{events.length === 1 ? '' : 's'}, oldest
-        first. Nothing here has been edited or removed.
+        {t(
+          'fullRecordFor',
+          traineeId,
+          events.length,
+          events.length === 1 ? '' : (lang === 'hi' ? '' : 's'),
+        )}
       </p>
       <ol className="ledger__list">
         {events.map((e, i) => {
@@ -59,9 +65,9 @@ function TraineeLedger({ traineeId, currentEventId }) {
               </span>
               <EvidenceBadge trust={e.trust_level} small />
               {superseded ? (
-                <span className="ledger__state">superseded, retained</span>
+                <span className="ledger__state">{t('supersededRetained')}</span>
               ) : (
-                <span className="ledger__state ledger__state--live">current</span>
+                <span className="ledger__state ledger__state--live">{t('current')}</span>
               )}
             </li>
           )
@@ -72,69 +78,69 @@ function TraineeLedger({ traineeId, currentEventId }) {
 }
 
 function EventDetail({ event, onClose }) {
+  const { t } = useGov()
   if (!event) return null
   return (
     <Modal
       open
       onClose={onClose}
       title={event.event_type}
-      subtitle={`Event ${event.id} · recorded ${longDate(event.date)}`}
+      subtitle={`Event ${event.id} · ${longDate(event.date)}`}
     >
       <dl className="kv">
-        <dt>Event ID</dt>
+        <dt>{t('eventId')}</dt>
         <dd className="num">{event.id}</dd>
 
-        <dt>Trainee</dt>
+        <dt>{t('colTrainee')}</dt>
         <dd>
           {event.trainee_name} <span className="num muted">({event.trainee_id})</span>
         </dd>
 
-        <dt>Date recorded</dt>
+        <dt>{t('dateRecorded')}</dt>
         <dd>{longDate(event.date)}</dd>
 
-        <dt>Reported by</dt>
+        <dt>{t('reportedBy')}</dt>
         <dd>{event.source}</dd>
 
-        <dt>Evidence level</dt>
+        <dt>{t('evidenceLevel')}</dt>
         <dd>
           <EvidenceBadge trust={event.trust_level} small />
         </dd>
 
         {event.employer ? (
           <>
-            <dt>Employer</dt>
+            <dt>{t('employer')}</dt>
             <dd>{event.employer}</dd>
           </>
         ) : null}
 
         {event.job_role ? (
           <>
-            <dt>Role</dt>
+            <dt>{t('role')}</dt>
             <dd>{event.job_role}</dd>
           </>
         ) : null}
 
         {event.salary ? (
           <>
-            <dt>Monthly wage</dt>
+            <dt>{t('monthlyWage')}</dt>
             <dd className="num">₹{event.salary.toLocaleString('en-IN')}</dd>
           </>
         ) : null}
 
-        <dt>Consent at time of use</dt>
+        <dt>{t('consentAtTime')}</dt>
         <dd>
           <span className={`pill pill--${event.consent_status === 'active' ? 'resolved' : 'disputed'}`}>
-            {event.consent_status === 'active' ? 'Consent active' : 'Consent withdrawn'}
+            {event.consent_status === 'active' ? t('consentActiveStatus') : t('consentWithdrawnStatus')}
           </span>
         </dd>
 
-        <dt>Effect on outcomes</dt>
+        <dt>{t('effectOnOutcomes')}</dt>
         <dd>{event.outcome_impact}</dd>
       </dl>
 
       <p className="note note--tight">
-        This record is append-only. If it is later contradicted, a new event is added above it — this
-        row is never edited or deleted, so the figure it supports can always be re-derived.
+        {t('appendOnlyNote')}
       </p>
 
       <TraineeLedger traineeId={event.trainee_id} currentEventId={event.id} />
@@ -143,6 +149,7 @@ function EventDetail({ event, onClose }) {
 }
 
 export default function AuditTrail() {
+  const { t } = useGov()
   const { data, loading } = useApi(() => api.getAuditLog({}), [])
   const [detail, setDetail] = useState(null)
   const [sourceFilter, setSourceFilter] = useState('all')
@@ -153,64 +160,66 @@ export default function AuditTrail() {
   return (
     <div className="stack">
       <div className="note">
-        Every outcome on this platform is calculated from dated events, and records are never silently
-        overwritten. A figure on the dashboard can be traced back to the individual events below.
+        {t('auditNote')}
       </div>
 
       <section className="panel">
         <div className="panel__head">
           <div>
-            <h2 className="panel__title">Audit trail</h2>
+            <h2 className="panel__title">{t('auditTrailTitle')}</h2>
             <p className="panel__desc">
               {loading
-                ? 'Loading source events…'
-                : `Showing the ${(data?.showing || 0).toLocaleString('en-IN')} most recent of ${(data?.total || 0).toLocaleString('en-IN')} events.`}
+                ? t('loadingSourceEvents')
+                : t(
+                    'showingEvents',
+                    (data?.showing || 0).toLocaleString('en-IN'),
+                    (data?.total || 0).toLocaleString('en-IN'),
+                  )}
             </p>
           </div>
-          <span className="pill pill--resolved" title="Records are append-only">
-            Append-only ledger
+          <span className="pill pill--resolved" title={t('appendOnlyNote')}>
+            {t('appendOnlyLedger')}
           </span>
         </div>
 
         <div className="filters filters--inline">
           <label className="field">
-            <span className="field__label">Reported by</span>
+            <span className="field__label">{t('reportedBy')}</span>
             <select
               className="select"
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
             >
-              <option value="all">All sources</option>
-              <option value="bank">Consent-based income signal</option>
-              <option value="employer">Employer confirmation</option>
-              <option value="trainee">Trainee check-in</option>
-              <option value="field_officer">Field officer visit</option>
+              <option value="all">{t('allSources')}</option>
+              <option value="bank">{t('consentBasedIncome')}</option>
+              <option value="employer">{t('employerConfirmation')}</option>
+              <option value="trainee">{t('traineeCheckin')}</option>
+              <option value="field_officer">{t('fieldOfficerVisit')}</option>
             </select>
           </label>
         </div>
 
         {!loading && rows.length === 0 ? (
           <p className="empty">
-            No source events match this filter selection. Try expanding the reporting period or
-            clearing the source filter.
+            {t('noEventsMatch')}
           </p>
         ) : (
           <div className="tblwrap">
             <table className="tbl tbl--audit">
               <caption className="sr-only">
-                Append-only ledger of source events behind every outcome figure
+                {t('auditTrailTitle')}
               </caption>
               <thead>
                 <tr>
-                  <th scope="col">Date</th>
-                  <th scope="col">Trainee</th>
-                  <th scope="col">Event</th>
-                  <th scope="col">Source</th>
-                  <th scope="col">Evidence</th>
-                  <th scope="col">Consent</th>
-                  <th scope="col">Effect on outcomes</th>
+                  <th scope="col">{t('colDate')}</th>
+                  <th scope="col">{t('colTrainee')}</th>
+                  <th scope="col">{t('colEvent')}</th>
+                  <th scope="col">{t('colSource')}</th>
+                  <th scope="col">{t('colEvidence')}</th>
+                  <th scope="col">{t('colConsent')}</th>
+                  <th scope="col">{t('colEffectOnOutcomes')}</th>
                   <th scope="col">
-                    <span className="sr-only">Details</span>
+                    <span className="sr-only">{t('details')}</span>
                   </th>
                 </tr>
               </thead>
@@ -233,13 +242,13 @@ export default function AuditTrail() {
                       <span
                         className={`pill pill--${e.consent_status === 'active' ? 'resolved' : 'disputed'}`}
                       >
-                        {e.consent_status === 'active' ? 'Active' : 'Withdrawn'}
+                        {e.consent_status === 'active' ? t('consentActive') : t('consentWithdrawn')}
                       </span>
                     </td>
                     <td className="muted">{e.outcome_impact}</td>
                     <td>
                       <button type="button" className="btn btn--sm" onClick={() => setDetail(e)}>
-                        View details
+                        {t('viewDetails')}
                       </button>
                     </td>
                   </tr>

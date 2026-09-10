@@ -3,11 +3,13 @@ import {
 } from 'recharts'
 import { inr } from '../../lib/format.js'
 import { BRAND, cohortRamp } from '../../lib/chartTheme.js'
+import { useGov } from '../../gov/GovContext.jsx'
 
 /** Average monthly wage per cohort, tracked from placement onwards. */
 export default function WageChart({ rows = [], cohorts = [] }) {
+  const { t } = useGov()
   if (!cohorts.length) {
-    return <div className="empty">No wage records in this slice.</div>
+    return <div className="empty">{t('noWageRecords')}</div>
   }
   const ramp = cohortRamp(cohorts.length)
   return (
@@ -39,3 +41,4 @@ export default function WageChart({ rows = [], cohorts = [] }) {
     </ResponsiveContainer>
   )
 }
+

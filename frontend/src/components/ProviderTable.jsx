@@ -1,25 +1,14 @@
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { EvidenceBadge } from './Evidence.jsx'
 import { dominantTier } from '../lib/evidence.js'
 import { int } from '../lib/format.js'
 import { MAGNITUDE } from '../lib/chartTheme.js'
+import { useGov } from '../gov/GovContext.jsx'
 
-const COLUMNS = [
-  { key: 'name', label: 'Training centre', align: 'left' },
-  { key: 'district', label: 'District', align: 'left' },
-  { key: 'certified_count', label: 'Certified', align: 'right' },
-  { key: 'headline_placement_pct', label: 'Reported', align: 'right' },
-  { key: 'verified_placement_pct', label: 'Verified', align: 'right', bar: true },
-  { key: 'proof_gap', label: 'Unproven gap', align: 'right' },
-  { key: 'retention_3mo', label: 'Retention 3mo', align: 'right' },
-  { key: 'role_match_pct', label: 'Role match', align: 'right' },
-  { key: 'stale_pct', label: 'Stale', align: 'right' },
-]
-
-const PctCell = ({ value }) =>
+const PctCell = ({ value, emptyTitle }) =>
   value === null || value === undefined ? (
-    <span className="faint" title="Checkpoint not yet reached for this centre">n/a</span>
+    <span className="faint" title={emptyTitle}>n/a</span>
   ) : (
     <span className="num">{value}%</span>
   )
@@ -29,21 +18,34 @@ const PctCell = ({ value }) =>
  * should look. Colour is never the only signal: the value is always readable,
  * and crossing cells also carry a title explaining why they are marked.
  */
-const FlagCell = ({ value, over, under, why }) => {
+const FlagCell = ({ value, over, under, why, markLabel }) => {
   if (value === null || value === undefined) {
     return <span className="faint">n/a</span>
   }
   const flagged = (over !== undefined && value >= over) || (under !== undefined && value <= under)
   return (
     <span className={`num ${flagged ? 'cell--flag' : ''}`} title={flagged ? why : undefined}>
-      {value}%{flagged ? <i className="cell__mark" aria-label=", needs attention"> ●</i> : null}
+      {value}%{flagged ? <i className="cell__mark" aria-label={markLabel}> ●</i> : null}
     </span>
   )
 }
 
 /** Centre ranking. Every column sorts; verified placement is the default order. */
 export default function ProviderTable({ providers = [], onSelect, activeProvider }) {
+  const { t } = useGov()
   const [sort, setSort] = useState({ key: 'verified_placement_pct', dir: 'desc' })
+
+  const COLUMNS = [
+    { key: 'name', label: t('colTrainingCentre'), align: 'left' },
+    { key: 'district', label: t('colDistrict'), align: 'left' },
+    { key: 'certified_count', label: t('colCertified'), align: 'right' },
+    { key: 'headline_placement_pct', label: t('colReported'), align: 'right' },
+    { key: 'verified_placement_pct', label: t('colVerified'), align: 'right', bar: true },
+    { key: 'proof_gap', label: t('colUnprovenGap'), align: 'right' },
+    { key: 'retention_3mo', label: t('colRetention3mo'), align: 'right' },
+    { key: 'role_match_pct', label: t('colRoleMatch'), align: 'right' },
+    { key: 'stale_pct', label: t('colStale'), align: 'right' },
+  ]
 
   const rows = useMemo(() => {
     const copy = [...providers]
@@ -68,7 +70,7 @@ export default function ProviderTable({ providers = [], onSelect, activeProvider
         : { key, dir: key === 'name' || key === 'district' ? 'asc' : 'desc' },
     )
 
-  if (!providers.length) return <div className="empty">No training centres match these filters.</div>
+  if (!providers.length) return <div className="empty">{t('noTrainingCentres')}</div>
 
   return (
     <div className="table-wrap">
@@ -116,9 +118,6 @@ export default function ProviderTable({ providers = [], onSelect, activeProvider
                     {p.verified_placement_pct}%
                   </span>
                   <span className="cellbar__track">
-                    {/* Neutral fill — length carries the magnitude. Colouring this
-                        by threshold would reuse a tier colour to mean "above
-                        target", which is not what green means anywhere else. */}
                     <span
                       className="cellbar__fill"
                       style={{ width: `${p.verified_placement_pct}%`, background: MAGNITUDE }}
@@ -130,22 +129,27 @@ export default function ProviderTable({ providers = [], onSelect, activeProvider
                 <FlagCell
                   value={p.proof_gap}
                   over={45}
-                  why="Most of this centre's reported placements cannot be shown to have lasted three months."
+                  why={t('whyProofGap')}
+                  markLabel={t('needsAttentionLabel')}
                 />
               </td>
-              <td className="right"><PctCell value={p.retention_3mo} /></td>
+              <td className="right">
+                <PctCell value={p.retention_3mo} emptyTitle={t('checkpointNotYetReached')} />
+              </td>
               <td className="right">
                 <FlagCell
                   value={p.role_match_pct}
                   under={5}
-                  why="Almost no one from this centre is working in the occupation they trained for."
+                  why={t('whyRoleMatch')}
+                  markLabel={t('needsAttentionLabel')}
                 />
               </td>
               <td className="right">
                 <FlagCell
                   value={p.stale_pct}
                   over={55}
-                  why="This centre's outcome rates rest on a shrinking base of responding trainees."
+                  why={t('whyStale')}
+                  markLabel={t('needsAttentionLabel')}
                 />
               </td>
             </tr>

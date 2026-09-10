@@ -1,11 +1,6 @@
-import { useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { TIERS, TIER_ORDER } from '../lib/evidence.js'
-
-const SOURCE_CHIPS = [
-  { key: 'checkin', label: 'Trainee check-in' },
-  { key: 'employer', label: 'Employer confirmation' },
-  { key: 'income', label: 'Consent-based income signal' },
-]
+import { useGov } from '../gov/GovContext.jsx'
 
 /**
  * The full evidence breakdown for a single headline figure.
@@ -28,8 +23,23 @@ export default function EvidenceDrawer({
   onViewEvents,
   onMethodology,
 }) {
+  const { t } = useGov()
   const panelRef = useRef(null)
   const openerRef = useRef(null)
+
+  const SOURCE_CHIPS = [
+    { key: 'checkin', label: t('srcTraineeCheckin') },
+    { key: 'employer', label: t('srcEmployerConfirmation') },
+    { key: 'income', label: t('srcConsentIncome') },
+  ]
+
+  const tierLabels = {
+    high: t('tierVerified'),
+    medium: t('tierCorroborated'),
+    low: t('tierSelfReported'),
+    stale: t('tierStale'),
+    conflict: t('tierNeedsReview'),
+  }
 
   useEffect(() => {
     if (!open) return undefined
@@ -84,14 +94,14 @@ export default function EvidenceDrawer({
         <header className="drawer__head">
           <div>
             <h2 className="drawer__title" id="drawer-title">
-              {title} — evidence breakdown
+              {title} — {t('evidenceBreakdown')}
             </h2>
             <p className="drawer__sub">
-              {cohort ? `Cohort: ${cohort}. ` : ''}
-              {population ? `Population: ${population} certified trainees.` : ''}
+              {cohort ? t('cohortLabel2', cohort) : ''}
+              {population ? t('populationLabel', population) : ''}
             </p>
           </div>
-          <button type="button" className="drawer__close" onClick={onClose} aria-label="Close evidence breakdown">
+          <button type="button" className="drawer__close" onClick={onClose} aria-label={t('closeEvidence')}>
             ✕
           </button>
         </header>
@@ -104,7 +114,7 @@ export default function EvidenceDrawer({
 
           <section className="drawer__section" aria-labelledby="drawer-tiers">
             <h3 className="drawer__h3" id="drawer-tiers">
-              How this figure is evidenced
+              {t('howEvidenced')}
             </h3>
 
             {total ? (
@@ -120,17 +130,17 @@ export default function EvidenceDrawer({
                         style={{ flexShrink: 0 }}
                       >
                         <i className="tier__dot" aria-hidden="true" />
-                        {tier.label}
+                        {tierLabels[k] || tier.label}
                       </span>
                       <div className="tierlist__body">
                         <p className="tierlist__stat">
                           <strong className="num">{pct}%</strong>
                           <span className="tierlist__count num">
-                            {count.toLocaleString('en-IN')} trainees
+                            {count.toLocaleString('en-IN')} {t('trainees')}
                           </span>
                         </p>
                         <p className="tierlist__meaning">{tier.meaning}</p>
-                        <p className="tierlist__source">Source: {tier.source}</p>
+                        <p className="tierlist__source">{t('source') || 'Source:'} {tier.source}</p>
                       </div>
                     </li>
                   )
@@ -138,15 +148,14 @@ export default function EvidenceDrawer({
               </ul>
             ) : (
               <p className="empty">
-                No verified outcomes are available for this filter selection yet. Try expanding the
-                reporting period or including corroborated records.
+                {t('noVerifiedOutcomes')}
               </p>
             )}
           </section>
 
           <section className="drawer__section" aria-labelledby="drawer-sources">
             <h3 className="drawer__h3" id="drawer-sources">
-              Data sources used
+              {t('dataSourcesUsed')}
             </h3>
             <ul className="chips">
               {SOURCE_CHIPS.map((c) => (
@@ -158,17 +167,16 @@ export default function EvidenceDrawer({
           </section>
 
           <p className="drawer__prov num">
-            Metric calculated from {(eventCount || 0).toLocaleString('en-IN')} dated, append-only
-            source events.
+            {t('metricCalcFrom', (eventCount || 0).toLocaleString('en-IN'))}
           </p>
         </div>
 
         <footer className="drawer__foot">
           <button type="button" className="btn btn--primary" onClick={onViewEvents}>
-            View source events
+            {t('viewSourceEvents')}
           </button>
           <button type="button" className="btn" onClick={onMethodology}>
-            Methodology
+            {t('methodology')}
           </button>
         </footer>
       </aside>
