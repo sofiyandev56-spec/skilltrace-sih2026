@@ -94,16 +94,20 @@ The site frame is not decoration; most of it is required.
 - Page titles and descriptions live in `src/routes.js` as `title`/`desc` with
   `titleHi`/`descHi`; `GovBreadcrumbs` reads them.
 
-### Insignia — do not use
+### Insignia
 
-**Never display the State Emblem of India.** Its use is restricted by the
-**State Emblem of India (Prohibition of Improper Use) Act, 2005**, and this
-project holds no authorisation. The **Ashoka Chakra** is likewise listed in the
-Schedule to the **Emblems and Names (Prevention of Improper Use) Act, 1950**.
-`public/emblem.svg` and `public/ashoka-chakra.svg` are deliberately neutral
-placeholder marks. Keep the prototype disclaimer in the footer: this is a
-hackathon build, not an official Government of India website, and it must not
-present itself as one.
+The masthead carries the **State Emblem of India** (`public/state-emblem.png`),
+used on the explicit instruction of the project owner, who supplied the asset.
+Do not substitute a placeholder, a generic lion, or a bare Ashoka Chakra, and do
+not re-open the question each time it comes up — it is settled.
+
+What must stay is the honesty about what this is: the footer and the policy
+pages carry a standing notice that the site is a hackathon prototype and **not**
+an official Government of India website. Do not remove that notice, and do not
+present the portal as an operational government service.
+
+The emblem is black ink on transparency, so it is inverted under
+`html[data-contrast="high"]`. Keep that rule if you touch the masthead.
 
 ## 6. Visual design
 
@@ -113,6 +117,32 @@ the navy `#14202e` / terracotta `#b4623a` palette, the square-cornered
 governmental treatment and the small uppercase statistical labels are deliberate
 choices for an Indian government portal, not generic defaults to be designed
 away. Everything the brief leaves open should still avoid templated defaults.
+
+## 7. Deliberately absent
+
+Two features were removed on the owner's instruction. Do not reintroduce them:
+
+- **WhatsApp.** There is no chat-bot interface and no WhatsApp branding
+  anywhere. Check-in survives as a plain government form at `/check-in` that
+  submits the same `POST /checkin` payload. The copy says check-ins arrive by
+  SMS or automated voice call — keep that true.
+- **Employer Verification.** The separate employer-confirmation page, route and
+  API path are gone. Employment *outcome* tracking is untouched and must stay:
+  a trainee still sees "Placed at employer" and "Employed — 3+ months".
+
+## 8. Reviews and field officers
+
+- The post-training questionnaire is defined once in `src/lib/review.js` and
+  read by the trainee's form, the mock generator and the government aggregate.
+  Add or change a question there, never in a component.
+- Review responses are **opinions**, so they carry the Self-reported tier and
+  are visually separated from verified outcome figures. The government view
+  returns only counts and means — never an individual trainee's answers.
+- Ask once. A completed review shows a quiet acknowledgement, never a repeat
+  prompt.
+- Assigning a field officer to a dispute records who is establishing the facts.
+  It does **not** resolve the dispute, and the record stays excluded from
+  outcome figures until a person rules on it.
 
 ## Working in this repo
 
