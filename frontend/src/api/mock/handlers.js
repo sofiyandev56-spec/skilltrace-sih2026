@@ -372,6 +372,21 @@ export function getTrainee(id) {
   return { ...t, events, ...classify(events) }
 }
 
+export function getBankStatements(id) {
+  const raw = store.rawData()
+  const t = raw.trainees.find((x) => x.id === id)
+  if (!t) return null
+  return {
+    trainee_id: t.id,
+    name: t.name,
+    course: t.course,
+    district: t.district,
+    bank_summary: t.bank_summary || null,
+    bank_months: raw.bank_months || [],
+    bank_series: t.bank_series || [],
+  }
+}
+
 /* ---- consent ---- */
 
 export function getConsent(traineeId) {

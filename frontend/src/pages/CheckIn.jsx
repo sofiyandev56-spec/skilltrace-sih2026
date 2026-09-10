@@ -156,7 +156,7 @@ export default function CheckIn() {
     }, 700)
   }
 
-  const current = stage === 'q1' ? Q1 : stage === 'q2' ? Q2[answer.key].options : []
+  const current = stage === 'q1' ? Q1 : stage === 'q2' && answer?.key && Q2[answer.key] ? Q2[answer.key].options : []
 
   if (people.loading && !people.data) return <div className="skeleton" style={{ height: 400 }} />
 

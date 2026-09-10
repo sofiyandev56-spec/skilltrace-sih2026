@@ -165,7 +165,7 @@ export default function Dashboard() {
               <div className="callout-rule" style={{ flex: '1 1 320px' }}>
                 <span aria-hidden="true" style={{ fontSize: 15 }}>⚖</span>
                 <span>
-                  <b>{pct(Math.round((d.headline_placement_pct - d.outcomes.employed.pct) * 10) / 10)}</b> of
+                  <b>{pct(Math.max(0, Math.round((d.headline_placement_pct - d.outcomes.employed.pct) * 10) / 10))}</b> of
                   this cohort was reported as placed but cannot be shown to have held the job for three
                   months. SkillTrace never reports those as employment.
                 </span>

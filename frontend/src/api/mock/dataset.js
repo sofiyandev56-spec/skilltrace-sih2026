@@ -25,6 +25,8 @@ export const COURSES = organizedData.courses || []
 
 export const COHORTS = organizedData.cohorts || []
 
+export const BANK_MONTHS = organizedData.bank_months || []
+
 export const AGE_GROUPS = ['18-24', '25-34', '35-44']
 export const GENDERS = ['Male', 'Female', 'Other']
 export const CATEGORIES = ['General', 'OBC', 'SC', 'ST']
@@ -146,6 +148,7 @@ export function buildDataset() {
   const disputes = organizedData.disputes || []
   const consents = organizedData.consents || []
   const followupQueue = organizedData.followupQueue || []
+  const bankMonths = organizedData.bank_months || []
 
-  return { providers, trainees, events, disputes, consents, followupQueue }
+  return { providers, trainees, events, disputes, consents, followupQueue, bank_months: bankMonths }
 }

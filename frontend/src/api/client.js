@@ -148,6 +148,9 @@ export const api = {
   /* trainees (used by the consent picker and check-in simulator) */
   getTrainees: (f = {}) => request(`/trainees${qs(f)}`, {}, () => mock.getTrainees(f)),
   getTrainee: (id) => request(`/trainees/${id}`, {}, () => mock.getTrainee(id)),
+
+  /* bank statements */
+  getBankStatements: (id) => request(`/bank-statements/${id}`, {}, () => mock.getBankStatements(id)),
 }
 
 export { mock }

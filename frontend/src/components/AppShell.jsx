@@ -28,6 +28,11 @@ export default function AppShell() {
     }
   }, [pathname])
 
+  // Scroll back to top on page navigation
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [pathname])
+
   const resetDemo = () => {
     mock.resetAll()
     window.location.reload()

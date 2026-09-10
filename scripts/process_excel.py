@@ -7,10 +7,31 @@ import os
 from datetime import datetime
 
 EXCEL_PATH = os.path.abspath('organized_data.xlsx')
+BANK_PATH = os.path.abspath('bank_statements.xlsx')
 OUTPUT_DIR = os.path.abspath('frontend/src/api/mock/data')
 OUTPUT_PATH = os.path.join(OUTPUT_DIR, 'organized_data.json')
 
 AS_OF = '2026-09-10'
+
+# 36 months from 2023-10 to 2026-09
+BANK_MONTHS = []
+_y, _m = 2023, 10
+for _ in range(36):
+    BANK_MONTHS.append(f"{_y}-{str(_m).zfill(2)}")
+    _m += 1
+    if _m > 12:
+        _m = 1
+        _y += 1
+
+def get_bank_month_index(date_str):
+    if not date_str:
+        return None
+    try:
+        d = datetime.strptime(date_str[:10], '%Y-%m-%d')
+        idx = (d.year - 2023) * 12 + (d.month - 10)
+        return idx if 0 <= idx < 36 else None
+    except Exception:
+        return None
 
 def days_between(a_str, b_str):
     d_a = datetime.strptime(a_str, '%Y-%m-%d')
@@ -177,6 +198,57 @@ def main():
         for name in provider_names
     ]
 
+    # 6b. Bank statements map
+    print(f"Reading {BANK_PATH}...")
+    wb_bank = openpyxl.load_workbook(BANK_PATH, data_only=True, read_only=True)
+    ws_b = wb_bank['Monthly Income']
+    bank_rows = list(ws_b.iter_rows(values_only=True))
+    bank_headers = bank_rows[0]
+    bank_map = {}
+    for col_idx, tid in enumerate(bank_headers):
+        if not tid:
+            continue
+        raw_vals = [bank_rows[r][col_idx] for r in range(1, len(bank_rows))]
+        cleaned_series = []
+        for v in raw_vals:
+            if isinstance(v, (int, float)):
+                cleaned_series.append(int(v))
+            else:
+                cleaned_series.append(None)
+        
+        pos_vals = [v for v in cleaned_series if v is not None and v > 0]
+        months_credited = len(pos_vals)
+        avg_income = round(sum(pos_vals) / months_credited) if months_credited else 0
+        latest_income = 0
+        for v in reversed(cleaned_series):
+            if v is not None and v > 0:
+                latest_income = v
+                break
+
+        is_all_none = all(v is None for v in cleaned_series)
+        if is_all_none:
+            status = 'unbanked'
+        elif months_credited >= 6:
+            status = 'retained'
+        elif months_credited >= 3:
+            status = 'active'
+        elif months_credited > 0:
+            status = 'irregular'
+        else:
+            status = 'inactive'
+
+        bank_map[tid] = {
+            'summary': {
+                'verified': months_credited >= 3,
+                'months_credited': months_credited,
+                'avg_income': avg_income,
+                'latest_income': latest_income,
+                'status': status
+            },
+            'series': cleaned_series
+        }
+    print(f"Loaded bank statements for {len(bank_map)} trainees.")
+
     # 7. Build Trainees and Events
     trainees = []
     events = []
@@ -234,6 +306,17 @@ def main():
         ass = assessments_map.get(t_id, {})
         certified = ass.get('certified', True)
 
+        b_info = bank_map.get(t_id, {
+            'summary': {
+                'verified': False,
+                'months_credited': 0,
+                'avg_income': 0,
+                'latest_income': 0,
+                'status': 'unbanked'
+            },
+            'series': [None] * 36
+        })
+
         trainees.append({
             'id': t_id,
             'name': name,
@@ -247,7 +330,9 @@ def main():
             'phone': phone,
             'education': education,
             'email': email,
-            'certified': certified
+            'certified': certified,
+            'bank_summary': b_info['summary'],
+            'bank_series': b_info['series']
         })
 
         # Build events for this trainee
@@ -266,14 +351,28 @@ def main():
 
         placed_recorded = False
         if placed_date:
-            source = 'employer' if is_verified_emp else 'trainee'
+            placed_m_idx = get_bank_month_index(placed_date)
+            bank_credit_at_placement = (
+                b_info['series'][placed_m_idx]
+                if placed_m_idx is not None and b_info['series'][placed_m_idx] is not None and b_info['series'][placed_m_idx] > 0
+                else None
+            )
+
+            if is_verified_emp:
+                source = 'employer'
+            elif bank_credit_at_placement:
+                source = 'bank'
+            else:
+                source = 'trainee'
+
+            salary = bank_credit_at_placement or eo.get('initial_income') or 12000
             events.append({
                 'id': f"EVT-{str(event_seq).zfill(5)}",
                 'trainee_id': t_id,
                 'date': placed_date,
                 'what_happened': 'placed',
                 'job_role': job_role,
-                'salary': eo.get('initial_income') or 12000,
+                'salary': salary,
                 'source': source,
                 'trust_level': trust_for(source, placed_date),
                 'employer': emp_name or 'Maharashtra Industrial Solutions'
@@ -287,46 +386,72 @@ def main():
             if not f_date or not f['contacted']:
                 continue
             
+            f_m_idx = get_bank_month_index(f_date)
+            bank_credit = (
+                b_info['series'][f_m_idx]
+                if f_m_idx is not None and b_info['series'][f_m_idx] is not None and b_info['series'][f_m_idx] > 0
+                else None
+            )
+
             f_status = f['current_status']
             if f_status == 'Employed':
                 # If previously placed, this is still_working
                 if placed_recorded:
-                    source = 'employer' if is_verified_emp else ('bank' if (idx % 3 == 0) else 'trainee')
+                    if is_verified_emp:
+                        source = 'employer'
+                    elif bank_credit:
+                        source = 'bank'
+                    else:
+                        source = 'trainee'
+
+                    salary = bank_credit or f['monthly_income'] or eo.get('current_income') or 15000
                     events.append({
                         'id': f"EVT-{str(event_seq).zfill(5)}",
                         'trainee_id': t_id,
                         'date': f_date,
                         'what_happened': 'still_working',
                         'job_role': job_role,
-                        'salary': f['monthly_income'] or eo.get('current_income') or 15000,
+                        'salary': salary,
                         'source': source,
                         'trust_level': trust_for(source, f_date),
                         'employer': emp_name or 'Maharashtra Industrial Solutions'
                     })
                     event_seq += 1
             elif f_status == 'Self-employed':
-                source = 'bank' if (idx % 2 == 0) else 'trainee'
+                if bank_credit:
+                    source = 'bank'
+                else:
+                    source = 'trainee'
+
+                salary = bank_credit or f['monthly_income'] or 12000
                 events.append({
                     'id': f"EVT-{str(event_seq).zfill(5)}",
                     'trainee_id': t_id,
                     'date': f_date,
                     'what_happened': 'self_employed',
                     'job_role': f"Self-employed — {intended_role}",
-                    'salary': f['monthly_income'] or 12000,
+                    'salary': salary,
                     'source': source,
                     'trust_level': trust_for(source, f_date),
                     'employer': None
                 })
                 event_seq += 1
             elif f_status == 'Apprentice':
-                source = 'employer' if is_verified_emp else 'trainee'
+                if is_verified_emp:
+                    source = 'employer'
+                elif bank_credit:
+                    source = 'bank'
+                else:
+                    source = 'trainee'
+
+                salary = bank_credit or f['monthly_income'] or 8000
                 events.append({
                     'id': f"EVT-{str(event_seq).zfill(5)}",
                     'trainee_id': t_id,
                     'date': f_date,
                     'what_happened': 'apprentice',
                     'job_role': f"Apprentice — {intended_role}",
-                    'salary': f['monthly_income'] or 8000,
+                    'salary': salary,
                     'source': source,
                     'trust_level': trust_for(source, f_date),
                     'employer': emp_name
@@ -350,30 +475,41 @@ def main():
         # If no placement and no followup event, add initial status from outcome
         trainee_evts = [e for e in events if e['trainee_id'] == t_id]
         if not trainee_evts:
+            comp_m_idx = get_bank_month_index(comp_date)
+            bank_credit = (
+                b_info['series'][comp_m_idx]
+                if comp_m_idx is not None and b_info['series'][comp_m_idx] is not None and b_info['series'][comp_m_idx] > 0
+                else None
+            )
+
             eo_status = eo.get('status')
             if eo_status == 'Self-employed':
+                source = 'bank' if bank_credit else 'trainee'
+                salary = bank_credit or eo.get('initial_income') or 11000
                 events.append({
                     'id': f"EVT-{str(event_seq).zfill(5)}",
                     'trainee_id': t_id,
                     'date': comp_date,
                     'what_happened': 'self_employed',
                     'job_role': f"Self-employed — {intended_role}",
-                    'salary': eo.get('initial_income') or 11000,
-                    'source': 'trainee',
-                    'trust_level': trust_for('trainee', comp_date),
+                    'salary': salary,
+                    'source': source,
+                    'trust_level': trust_for(source, comp_date),
                     'employer': None
                 })
                 event_seq += 1
             elif eo_status == 'Apprentice':
+                source = 'employer' if is_verified_emp else ('bank' if bank_credit else 'trainee')
+                salary = bank_credit or eo.get('initial_income') or 7500
                 events.append({
                     'id': f"EVT-{str(event_seq).zfill(5)}",
                     'trainee_id': t_id,
                     'date': comp_date,
                     'what_happened': 'apprentice',
                     'job_role': f"Apprentice — {intended_role}",
-                    'salary': eo.get('initial_income') or 7500,
-                    'source': 'trainee',
-                    'trust_level': trust_for('trainee', comp_date),
+                    'salary': salary,
+                    'source': source,
+                    'trust_level': trust_for(source, comp_date),
                     'employer': emp_name
                 })
                 event_seq += 1
@@ -507,6 +643,7 @@ def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     payload = {
         'as_of': AS_OF,
+        'bank_months': BANK_MONTHS,
         'districts': sorted(list(districts_set)),
         'courses': courses_list,
         'cohorts': sorted(list(cohorts_set)),
