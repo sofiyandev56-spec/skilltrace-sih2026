@@ -22,6 +22,7 @@ import ClientDashboard from './pages/ClientDashboard.jsx'
 import MinistryLogin from './pages/MinistryLogin.jsx'
 import ProviderDetail from './pages/ProviderDetail.jsx'
 import AuditTrail from './pages/AuditTrail.jsx'
+import ChatbotWidget from './chatbot/ChatbotWidget.jsx'
 
 /** Keeps the browser tab title in step with the page and the language. */
 function useDocumentTitle() {
@@ -127,6 +128,7 @@ export default function App() {
 
         <GovPolicyModal />
         <AuthModal />
+        <ChatbotWidget />
       </div>
     </ToastProvider>
   )
