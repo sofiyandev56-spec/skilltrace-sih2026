@@ -5,6 +5,7 @@ import { useApi } from '../lib/useApi.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from '../components/Toast.jsx'
 import QuickReview from '../components/QuickReview.jsx'
+import IncomeContinuity from '../components/IncomeContinuity.jsx'
 import { EvidenceBadge } from '../components/Evidence.jsx'
 import { BUCKET_META } from '../lib/evidence.js'
 import { inr, longDate, relativeAge } from '../lib/format.js'
@@ -262,6 +263,8 @@ export default function ClientDashboard() {
               {t('lastConfirmed', relativeAge(record.event?.date, AS_OF))}
             </span>
           </div>
+
+          <IncomeContinuity record={record} />
         </div>
       </section>
 

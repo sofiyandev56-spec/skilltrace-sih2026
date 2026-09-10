@@ -22,6 +22,12 @@ export const AS_OF = organizedData.as_of ?? '2026-09-10'
 
 export const DISTRICTS = organizedData.districts
 
+/**
+ * Calendar months covered by the bank statement extract, oldest first, as
+ * 'YYYY-MM'. Each trainee's `bank_series` is indexed against this.
+ */
+export const BANK_MONTHS = organizedData.bank_months ?? []
+
 /** Each course trains for one intended job role, with a planned placement target. */
 export const COURSES = organizedData.courses
 

@@ -10,13 +10,18 @@ export function GovProvider({ children }) {
   const [contrast, setContrast] = useState(() => localStorage.getItem('skilltrace.contrast') || 'standard')
   const [policyModal, setPolicyModal] = useState({ open: false, tab: 'privacy' })
 
+  // Dates and month names read a module-level locale, so it has to be set
+  // while rendering rather than in an effect: an effect runs after the
+  // children have already rendered, which left every date on the page one
+  // language behind the one the reader had just chosen.
+  setFormatLocale(lang)
+
   // Sync html attributes on change
   useEffect(() => {
     localStorage.setItem('skilltrace.lang', lang)
     // Screen readers switch voice off this attribute, so it must track the
     // chosen language and not just the dictionary.
     document.documentElement.setAttribute('lang', lang)
-    setFormatLocale(lang)
   }, [lang])
 
   useEffect(() => {

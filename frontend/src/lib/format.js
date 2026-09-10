@@ -38,6 +38,14 @@ export function longDate(iso) {
   return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`
 }
 
+/** 'YYYY-MM' as a short month and year, e.g. "Mar 2025". */
+export function monthLabel(ym) {
+  if (!ym) return '—'
+  const [y, m] = String(ym).split('-')
+  const months = MONTHS_BY_LOCALE[LOCALE] || MONTHS_BY_LOCALE['en-IN']
+  return `${months[Number(m) - 1] ?? m} ${y}`
+}
+
 export function daysAgo(iso, asOf) {
   if (!iso) return null
   const a = new Date(`${iso}T00:00:00Z`)

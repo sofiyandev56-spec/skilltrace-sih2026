@@ -3357,3 +3357,111 @@ html[data-contrast="high"] .story__gap { background: #fff; }
   .gov-identity--compact .gov-identity__emblem { height: 44px; }
   .gov-footer--compact .gov-footer__inner { padding: 13px 16px 14px; }
 }
+
+/* ==================================================================
+   Income continuity — the bank extract drawn as monthly credits
+   ================================================================== */
+.bankrow {
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--border);
+}
+.bankrow__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+}
+.bankrow__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.bankrow__count { font-size: 0.76rem; color: var(--text-muted); }
+
+.bankrow__chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 46px;
+  padding: 0;
+}
+.bankrow__bar {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+  background: var(--bg-sunken);
+  border-radius: 1px;
+}
+/* The filled part is a child-less pseudo so an empty month still shows its
+   track rather than collapsing the row. */
+.bankrow__bar.is-credited::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--h, 0%);
+  background: var(--navy-300);
+  border-radius: 1px;
+}
+.bankrow__bar.is-run::after { background: var(--tier-high); }
+
+.bankrow__axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+}
+
+.bankrow__proof {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 10px 0 0;
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: var(--tier-high);
+  font-weight: 600;
+}
+.bankrow__proof-tick { flex: none; font-weight: 700; }
+.bankrow__note {
+  margin: 10px 0 0;
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.bankrow--unbanked .bankrow__unbanked-title {
+  margin: 0 0 4px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--tier-stale);
+}
+.bankrow--unbanked .bankrow__unbanked-body {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.bankrow__table { margin-top: 9px; }
+.bankrow__table > summary {
+  font-size: 0.75rem;
+  color: var(--navy-500);
+  cursor: pointer;
+}
+.bankrow__table > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bankrow__table .tbl { margin-top: 8px; }
+.bankrow__table[open] > summary { margin-bottom: 4px; }
+
+@media (max-width: 560px) {
+  .bankrow__chart { height: 38px; gap: 1px; }
+}

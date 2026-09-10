@@ -5,7 +5,15 @@
  * really filter, and withdrawing consent really removes a person's outcomes
  * from every number on the dashboard.
  */
-import { AS_OF, COHORTS, COURSES, DISTRICTS, FIELD_OFFICERS, daysBetween } from './dataset.js'
+import {
+  AS_OF,
+  BANK_MONTHS,
+  COHORTS,
+  COURSES,
+  DISTRICTS,
+  FIELD_OFFICERS,
+  daysBetween,
+} from './dataset.js'
 import { QUESTION_BY_ID, REVIEW_QUESTIONS, asFive, meanScore } from '../../lib/review.js'
 import * as store from './store.js'
 
@@ -13,14 +21,63 @@ import * as store from './store.js'
 /* outcome classification                                              */
 /* ------------------------------------------------------------------ */
 
+/** Consecutive months of salary credits that satisfy the 3-month rule. */
+const BANK_RUN_MONTHS = 3
+
+/**
+ * The second, independent way to satisfy the 3-month rule: an unbroken run of
+ * salary credits starting at or after the month of placement. Three months of
+ * money arriving is the same fact a `still_working` confirmation asserts, from
+ * a source that cannot be talked up.
+ *
+ * Returns null when the trainee has no bank record at all. That is missing
+ * evidence, not a failed outcome, and the two must never be conflated — 13.6%
+ * of placed trainees are unbanked and can never be proven this way.
+ */
+export function bankContinuity(trainee, placement) {
+  const series = trainee?.bank_series
+  if (!trainee?.bank_summary?.verified || !Array.isArray(series) || !placement?.date) return null
+
+  const from = BANK_MONTHS.indexOf(String(placement.date).slice(0, 7))
+  if (from < 0) return null
+
+  let run = 0
+  let startedAt = null
+  for (let i = from; i < series.length; i += 1) {
+    const credited = typeof series[i] === 'number' && series[i] > 0
+    if (!credited) {
+      run = 0
+      startedAt = null
+      continue
+    }
+    if (run === 0) startedAt = i
+    run += 1
+    if (run >= BANK_RUN_MONTHS) {
+      return {
+        months: run,
+        from: BANK_MONTHS[startedAt],
+        through: BANK_MONTHS[i],
+        latest_income: trainee.bank_summary.latest_income,
+      }
+    }
+  }
+  return null
+}
+
 /**
  * THE rule: a placement only becomes "employed" once we have evidence the
  * person was still at the SAME employer 3+ months later. A bare `placed`
  * event is reported as "awaiting 3-month confirmation", never as employment.
+ *
+ * Two things can supply that evidence, and the result records which one did:
+ * a `still_working` confirmation ('confirmation'), or an unbroken run of
+ * salary credits in the bank extract ('bank'). The bank path is only ever
+ * consulted when a confirmation is absent, so it adds proof and never
+ * overrides a human one.
  */
-export function classify(events) {
+export function classify(events, trainee = null) {
   if (!events || events.length === 0) {
-    return { bucket: 'no_data', trust: 'stale', event: null }
+    return { bucket: 'no_data', trust: 'stale', event: null, proof: null }
   }
   const last = events[events.length - 1]
 
@@ -29,13 +86,47 @@ export function classify(events) {
       .reverse()
       .find((e) => e.what_happened === 'placed' && e.employer === last.employer)
     if (placement && daysBetween(placement.date, last.date) >= 75) {
-      return { bucket: 'employed', trust: last.trust_level, event: last, placement }
+      return {
+        bucket: 'employed',
+        trust: last.trust_level,
+        event: last,
+        placement,
+        proof: 'confirmation',
+      }
     }
-    return { bucket: 'awaiting_confirmation', trust: last.trust_level, event: last, placement }
+    // The confirmation was too soon to count, but the money may still say so.
+    const bank = bankContinuity(trainee, placement)
+    if (bank) {
+      return { bucket: 'employed', trust: 'high', event: last, placement, proof: 'bank', bank }
+    }
+    return {
+      bucket: 'awaiting_confirmation',
+      trust: last.trust_level,
+      event: last,
+      placement,
+      proof: null,
+    }
   }
 
   if (last.what_happened === 'placed') {
-    return { bucket: 'awaiting_confirmation', trust: last.trust_level, event: last, placement: last }
+    const bank = bankContinuity(trainee, last)
+    if (bank) {
+      return {
+        bucket: 'employed',
+        trust: 'high',
+        event: last,
+        placement: last,
+        proof: 'bank',
+        bank,
+      }
+    }
+    return {
+      bucket: 'awaiting_confirmation',
+      trust: last.trust_level,
+      event: last,
+      placement: last,
+      proof: null,
+    }
   }
   if (last.what_happened === 'self_employed') {
     return { bucket: 'self_employed', trust: last.trust_level, event: last }
@@ -110,7 +201,7 @@ export function getDashboard(filters = {}) {
   const overallTiers = emptyTiers()
 
   for (const t of cohort) {
-    const c = classify(data.eventsByTrainee[t.id])
+    const c = classify(data.eventsByTrainee[t.id], t)
     counts[c.bucket] += 1
     tiers[c.bucket][c.trust] += 1
     if (c.event) overallTiers[c.trust] += 1
@@ -209,7 +300,7 @@ export function getDashboard(filters = {}) {
     // "Contacted" means the trainee themselves answered — a bank or employer
     // signal is evidence about them, not contact with them.
     if (evs.some((e) => e.source === 'trainee' || e.source === 'field_officer')) contacted += 1
-    const c = classify(evs)
+    const c = classify(evs, t)
     if (c.bucket === 'employed') {
       retained3 += 1
       const def = COURSES.find((x) => x.name === t.course)
@@ -288,7 +379,7 @@ export function getProviders(filters = {}) {
       for (const t of own) {
         const evs = data.eventsByTrainee[t.id] || []
         if (evs.some((e) => e.what_happened === 'placed')) placedEver += 1
-        const c = classify(evs)
+        const c = classify(evs, t)
         if (c.trust === 'stale') stale += 1
         if (c.bucket === 'employed') {
           verified += 1
@@ -336,7 +427,7 @@ export function getSkillGap(filters = {}) {
     let working = 0
     let onRole = 0
     for (const t of own) {
-      const c = classify(data.eventsByTrainee[t.id])
+      const c = classify(data.eventsByTrainee[t.id], t)
       if (!['employed', 'awaiting_confirmation', 'apprentice', 'self_employed'].includes(c.bucket)) continue
       working += 1
       gapTiers[c.trust] += 1
@@ -446,7 +537,7 @@ export function assignFollowup(traineeId, officer) {
 export function getTrainees(filters = {}) {
   const data = store.currentData()
   return applyFilters(data.trainees, filters).map((t) => {
-    const c = classify(data.eventsByTrainee[t.id])
+    const c = classify(data.eventsByTrainee[t.id], t)
     return { ...t, outcome: c.bucket, trust_level: c.trust, employer: c.event?.employer ?? null }
   })
 }
@@ -456,7 +547,9 @@ export function getTrainee(id) {
   const t = data.trainees.find((x) => x.id === id) || store.rawData().trainees.find((x) => x.id === id)
   if (!t) return null
   const events = data.eventsByTrainee[t.id] || []
-  return { ...t, events, ...classify(events) }
+  // bank_months travels with the record so the client can label the series
+  // without importing the mock dataset.
+  return { ...t, events, bank_months: BANK_MONTHS, ...classify(events, t) }
 }
 
 /* ---- consent ---- */
@@ -475,7 +568,7 @@ export function getConsent(traineeId) {
     // What withdrawal will actually remove — shown on the page before you click.
     impact: {
       events: events.length,
-      outcome: classify(events).bucket,
+      outcome: classify(events, trainee).bucket,
       disputes: raw.disputes.filter((d) => d.trainee_id === traineeId).length,
       district: trainee.district,
       course: trainee.course,
@@ -729,7 +822,7 @@ export function getProvider(id, filters = {}) {
 
   for (const t of cohort) {
     const evs = data.eventsByTrainee[t.id] || []
-    const c = classify(evs)
+    const c = classify(evs, t)
     const def = COURSES.find((x) => x.name === t.course)
     const slot = (byCourse[t.course] ||= {
       course: t.course,
@@ -824,7 +917,7 @@ export function getAttention(filters = {}) {
     for (const t of own) {
       const evs = data.eventsByTrainee[t.id] || []
       if (evs.some((e) => e.what_happened === 'placed')) placedEver += 1
-      const c = classify(evs)
+      const c = classify(evs, t)
       if (c.trust === 'stale') stale += 1
       if (c.bucket === 'employed') {
         employed += 1
