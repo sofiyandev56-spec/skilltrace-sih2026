@@ -103,7 +103,7 @@ export default function ProviderTable({ providers = [], onSelect, activeProvider
             >
               <td className="rank">{i + 1}</td>
               <td>
-                <Link className="tbl__link" to={`/providers/${p.id}`}>
+                <Link className="tbl__link" to={`/ministry/providers/${p.id}`}>
                   {p.name}
                 </Link>
                 <div className="faint small mono">{p.id}</div>

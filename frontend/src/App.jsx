@@ -11,7 +11,7 @@ import GovFooter from './gov/GovFooter.jsx'
 import GovPolicyModal from './gov/GovPolicyModal.jsx'
 import AuthModal from './auth/AuthModal.jsx'
 import { ToastProvider } from './components/Toast.jsx'
-import ProtectedRoute from './auth/ProtectedRoute.jsx'
+import { ClientRoute, MinistryRoute } from './auth/ProtectedRoute.jsx'
 import { routeMetaFor } from './routes.js'
 import Dashboard from './pages/Dashboard.jsx'
 import Disputes from './pages/Disputes.jsx'
@@ -19,18 +19,18 @@ import Consent from './pages/Consent.jsx'
 import CheckIn from './pages/CheckIn.jsx'
 import FollowupQueue from './pages/FollowupQueue.jsx'
 import ClientDashboard from './pages/ClientDashboard.jsx'
+import MinistryLogin from './pages/MinistryLogin.jsx'
 import ProviderDetail from './pages/ProviderDetail.jsx'
 import AuditTrail from './pages/AuditTrail.jsx'
 
 /** Keeps the browser tab title in step with the page and the language. */
 function useDocumentTitle() {
   const { pathname } = useLocation()
-  const { lang } = useGov()
+  const { lang, t } = useGov()
   useEffect(() => {
     const meta = routeMetaFor(pathname)
-    const title = lang === 'hi' && meta.titleHi ? meta.titleHi : meta.title
-    document.title = `${title} — SkillTrace`
-  }, [pathname, lang])
+    document.title = `${t(meta.titleKey)} — SkillTrace`
+  }, [pathname, lang, t])
 }
 
 /** Badge counts for the primary navigation, kept current after any change. */
@@ -89,75 +89,31 @@ export default function App() {
 
       <main className="gov-main-content" id="main-content" tabIndex={-1}>
         <Routes>
-          {/* Administrative oversight — accredited officers only. */}
+          {/* ---- Ministry: governance, analytics, adjudication ---- */}
+          <Route path="/ministry/login" element={<MinistryLogin />} />
+          <Route path="/ministry" element={<MinistryRoute><Dashboard /></MinistryRoute>} />
+          <Route path="/ministry/disputes" element={<MinistryRoute><Disputes /></MinistryRoute>} />
+          <Route path="/ministry/follow-up" element={<MinistryRoute><FollowupQueue /></MinistryRoute>} />
+          <Route path="/ministry/audit" element={<MinistryRoute><AuditTrail /></MinistryRoute>} />
           <Route
-            path="/"
-            element={
-              <ProtectedRoute allowedRoles={['government']}>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/disputes"
-            element={
-              <ProtectedRoute allowedRoles={['government']}>
-                <Disputes />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/follow-up"
-            element={
-              <ProtectedRoute allowedRoles={['government']}>
-                <FollowupQueue />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/providers/:id"
-            element={
-              <ProtectedRoute allowedRoles={['government']}>
-                <ProviderDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/audit"
-            element={
-              <ProtectedRoute allowedRoles={['government']}>
-                <AuditTrail />
-              </ProtectedRoute>
-            }
+            path="/ministry/providers/:id"
+            element={<MinistryRoute><ProviderDetail /></MinistryRoute>}
           />
 
-          {/* The trainee's own record, and the rights they hold over it. */}
-          <Route
-            path="/client"
-            element={
-              <ProtectedRoute allowedRoles={['client', 'government']}>
-                <ClientDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/consent"
-            element={
-              <ProtectedRoute allowedRoles={['client', 'government']}>
-                <Consent />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/check-in"
-            element={
-              <ProtectedRoute allowedRoles={['client', 'government']}>
-                <CheckIn />
-              </ProtectedRoute>
-            }
-          />
+          {/* ---- Client: the trainee's own record and rights ---- */}
+          <Route path="/client" element={<ClientRoute><ClientDashboard /></ClientRoute>} />
+          <Route path="/client/consent" element={<ClientRoute><Consent /></ClientRoute>} />
+          <Route path="/client/check-in" element={<ClientRoute><CheckIn /></ClientRoute>} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* ---- Legacy paths, kept so old links and bookmarks still land ---- */}
+          <Route path="/" element={<Navigate to="/ministry" replace />} />
+          <Route path="/disputes" element={<Navigate to="/ministry/disputes" replace />} />
+          <Route path="/follow-up" element={<Navigate to="/ministry/follow-up" replace />} />
+          <Route path="/audit" element={<Navigate to="/ministry/audit" replace />} />
+          <Route path="/consent" element={<Navigate to="/client/consent" replace />} />
+          <Route path="/check-in" element={<Navigate to="/client/check-in" replace />} />
+
+          <Route path="*" element={<Navigate to="/ministry" replace />} />
         </Routes>
       </main>
 

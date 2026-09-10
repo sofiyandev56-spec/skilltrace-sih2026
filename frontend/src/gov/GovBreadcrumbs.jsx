@@ -1,26 +1,16 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext.jsx'
 import { useGov } from './GovContext.jsx'
 import { routeMetaFor } from '../routes.js'
 
-const ROUTE_SECTIONS = {
-  '/': { sectionEn: 'Oversight', sectionHi: 'निगरानी' },
-  '/disputes': { sectionEn: 'Oversight', sectionHi: 'निगरानी' },
-  '/follow-up': { sectionEn: 'Oversight', sectionHi: 'निगरानी' },
-  '/audit': { sectionEn: 'Transparency', sectionHi: 'पारदर्शिता' },
-  '/check-in': { sectionEn: 'Data Collection', sectionHi: 'डेटा संग्रह' },
-  '/consent': { sectionEn: 'Trainee Rights', sectionHi: 'प्रशिक्षार्थी अधिकार' },
-}
 
 export default function GovBreadcrumbs() {
+  const { isMinistry } = useAuth()
+  const home = isMinistry ? '/ministry' : '/client'
   const { pathname } = useLocation()
   const { lang, t } = useGov()
   const meta = routeMetaFor(pathname)
-  const sec =
-    ROUTE_SECTIONS[pathname] ||
-    (pathname.startsWith('/providers/')
-      ? { sectionEn: 'Oversight', sectionHi: 'निगरानी' }
-      : { sectionEn: 'Portal', sectionHi: 'पोर्टल' })
 
   return (
     <div className="gov-breadcrumb-bar">
@@ -28,20 +18,20 @@ export default function GovBreadcrumbs() {
         <nav aria-label="Breadcrumb" className="gov-breadcrumb">
           <ol>
             <li>
-              <Link to="/" className="gov-breadcrumb__link">
+              <Link to={home} className="gov-breadcrumb__link">
                 {t('breadcrumbHome')}
               </Link>
             </li>
             <li className="gov-breadcrumb__sep" aria-hidden="true">&rsaquo;</li>
             <li>
               <span className="gov-breadcrumb__text">
-                {lang === 'hi' ? sec.sectionHi : sec.sectionEn}
+                {t(meta.sectionKey)}
               </span>
             </li>
             <li className="gov-breadcrumb__sep" aria-hidden="true">&rsaquo;</li>
             <li aria-current="page">
               <span className="gov-breadcrumb__current">
-                {lang === 'hi' && meta.titleHi ? meta.titleHi : meta.title}
+                {t(meta.titleKey)}
               </span>
             </li>
           </ol>
@@ -49,7 +39,7 @@ export default function GovBreadcrumbs() {
 
         {meta.desc && (
           <div className="gov-page-desc">
-            {lang === 'hi' && meta.descHi ? meta.descHi : meta.desc}
+            {meta.descKey ? t(meta.descKey) : null}
           </div>
         )}
       </div>

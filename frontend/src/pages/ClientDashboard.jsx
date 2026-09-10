@@ -393,10 +393,10 @@ export default function ClientDashboard() {
                 {t(
                   'recordsHeld',
                   record.events?.length || 0,
-                  (record.events?.length || 0) === 1 ? '' : (lang === 'hi' ? '' : 's'),
+                  (record.events?.length || 0) === 1 ? '' : (lang === 'en' ? 's' : ''),
                 )}
               </span>
-              <Link to="/consent" className="credential__link">
+              <Link to="/client/consent" className="credential__link">
                 {t('manageOrWithdraw')}
               </Link>
             </div>
@@ -412,7 +412,7 @@ export default function ClientDashboard() {
             {t('needHelpBody')}
           </p>
         </div>
-        <Link to="/check-in" className="btn">
+        <Link to="/client/check-in" className="btn">
           {t('reportProblem')}
         </Link>
       </section>

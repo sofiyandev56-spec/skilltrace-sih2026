@@ -173,7 +173,7 @@ export default function Consent() {
                 {t(
                   'withdrawExplanation',
                   c.impact.events,
-                  c.impact.events === 1 ? '' : (lang === 'hi' ? '' : 's'),
+                  c.impact.events === 1 ? '' : (lang === 'en' ? 's' : ''),
                 )}
               </p>
 
@@ -266,7 +266,7 @@ export default function Consent() {
               <button type="button" className="btn" onClick={() => setStep('idle')}>
                 {t('stayOnPage')}
               </button>
-              <button type="button" className="btn btn--primary" onClick={() => navigate('/')}>
+              <button type="button" className="btn btn--primary" onClick={() => navigate('/client')}>
                 {t('openDashboard')}
               </button>
             </div>

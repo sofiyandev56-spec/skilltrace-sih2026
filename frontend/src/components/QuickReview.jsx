@@ -86,10 +86,10 @@ export default function QuickReview({ traineeId, courseName }) {
   }
 
   const promptText = question
-    ? (lang === 'hi' && question.promptHi ? question.promptHi : question.prompt)
+    ? t(question.promptKey)
     : null
 
-  const optionLabel = (o) => (lang === 'hi' && o.labelHi ? o.labelHi : o.label)
+  const optionLabel = (o) => t(o.labelKey)
 
   return (
     <section className="review" aria-labelledby="review-title">

@@ -584,14 +584,14 @@ export function getReviewInsights(filters = {}) {
     const mean = meanScore(values, q.id)
     return {
       id: q.id,
-      label: q.shortLabel,
-      prompt: q.prompt,
+      labelKey: q.shortLabelKey,
+      promptKey: q.promptKey,
       responses: values.length,
       mean,
       out_of_five: asFive(mean),
       distribution: q.options.map((o) => ({
         value: o.value,
-        label: o.label,
+        labelKey: o.labelKey,
         count: counts[o.value],
         pct: values.length ? Math.round((counts[o.value] / values.length) * 100) : 0,
       })),

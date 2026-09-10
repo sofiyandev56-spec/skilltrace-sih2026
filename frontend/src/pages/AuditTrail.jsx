@@ -6,6 +6,19 @@ import Modal from '../components/Modal.jsx'
 import { longDate } from '../lib/format.js'
 import { useGov } from '../gov/GovContext.jsx'
 
+/**
+ * Event names are interface text, not record data, so they are translated
+ * here rather than taken from the API's English `event_type`.
+ */
+const WHAT_KEY = {
+  placed: 'whatPlaced',
+  still_working: 'whatStillWorking',
+  left_job: 'whatLeftJob',
+  self_employed: 'whatSelfEmployed',
+  apprentice: 'whatApprentice',
+  not_working: 'whatNotWorking',
+}
+
 const SOURCE_ICON = {
   bank: '₹',
   employer: '🏢',
@@ -28,15 +41,6 @@ function TraineeLedger({ traineeId, currentEventId }) {
   const events = data?.events || []
   if (!events.length) return null
 
-  const WHAT_LABEL = {
-    placed: t('whatPlaced'),
-    still_working: t('whatStillWorking'),
-    left_job: t('whatLeftJob'),
-    self_employed: t('whatSelfEmployed'),
-    apprentice: t('whatApprentice'),
-    not_working: t('whatNotWorking'),
-  }
-
   return (
     <div className="ledger">
       <p className="ledger__head">
@@ -44,7 +48,7 @@ function TraineeLedger({ traineeId, currentEventId }) {
           'fullRecordFor',
           traineeId,
           events.length,
-          events.length === 1 ? '' : (lang === 'hi' ? '' : 's'),
+          events.length === 1 ? '' : (lang === 'en' ? 's' : ''),
         )}
       </p>
       <ol className="ledger__list">
@@ -60,7 +64,7 @@ function TraineeLedger({ traineeId, currentEventId }) {
               </span>
               <span className="ledger__when num">{longDate(e.date)}</span>
               <span className="ledger__what">
-                {WHAT_LABEL[e.what_happened] || e.what_happened}
+                {WHAT_KEY[e.what_happened] ? t(WHAT_KEY[e.what_happened]) : e.event_type}
                 {e.employer ? <span className="muted"> · {e.employer}</span> : null}
               </span>
               <EvidenceBadge trust={e.trust_level} small />
@@ -84,7 +88,7 @@ function EventDetail({ event, onClose }) {
     <Modal
       open
       onClose={onClose}
-      title={event.event_type}
+      title={WHAT_KEY[event.what_happened] ? t(WHAT_KEY[event.what_happened]) : event.event_type}
       subtitle={`Event ${event.id} · ${longDate(event.date)}`}
     >
       <dl className="kv">
@@ -230,7 +234,7 @@ export default function AuditTrail() {
                     <td>
                       <span className="num muted">{e.trainee_id}</span>
                     </td>
-                    <td>{e.event_type}</td>
+                    <td>{WHAT_KEY[e.what_happened] ? t(WHAT_KEY[e.what_happened]) : e.event_type}</td>
                     <td>
                       <span aria-hidden="true">{SOURCE_ICON[e.source_key]} </span>
                       {e.source}

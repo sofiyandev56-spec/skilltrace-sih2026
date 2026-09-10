@@ -910,7 +910,16 @@ a { color: var(--accent-dark); }
 /* ==================================================================
    Tables
    ================================================================== */
-.table-wrap { overflow-x: auto; }
+.table-wrap, .tblwrap {
+  overflow-x: auto;
+  /* min-width:0 stops the wrapper being stretched by its own table when it
+     sits inside a grid or flex parent, which is what lets a wide table push
+     the page body sideways instead of scrolling inside its own box. */
+  min-width: 0;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.table-wrap table, .tblwrap table { min-width: max-content; }
 table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl th {
   text-align: left; padding: 9px 12px;
@@ -2143,13 +2152,18 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 /* ==================================================================
    Toasts
    ================================================================== */
+.toasts:empty { display: none; }
 .toasts {
   position: fixed; z-index: 300;
+  /* The host spans the screen on small viewports; without this the empty
+     container itself becomes a horizontal scroll source. */
+  pointer-events: none;
   right: 20px; bottom: 20px;
   display: flex; flex-direction: column; gap: 10px;
   max-width: min(380px, calc(100vw - 40px));
 }
 .toast {
+  pointer-events: auto;
   display: flex; align-items: flex-start; gap: 11px;
   background: var(--navy); color: #eef3f8;
   border-left: 4px solid var(--tier-high);
@@ -2390,7 +2404,7 @@ html[data-contrast="high"] .gov-footer::before { display: none; }
   .gov-footer__info-grid { grid-template-columns: 1fr; gap: 16px; }
   .gov-footer__meta { text-align: left; }
   .gov-footer__meta-item { justify-content: flex-start; }
-  .toasts { right: 12px; left: 12px; bottom: 12px; max-width: none; }
+  .toasts { right: 12px; left: 12px; bottom: 12px; max-width: calc(100vw - 24px); }
 }
 
 /* Tables are the one thing that must scroll rather than reflow — a

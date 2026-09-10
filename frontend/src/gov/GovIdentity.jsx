@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext.jsx'
 import { useGov } from './GovContext.jsx'
 import { STRINGS } from './i18n.js'
 import ModeBadge from '../components/ModeBadge.jsx'
@@ -12,6 +13,8 @@ import ModeBadge from '../components/ModeBadge.jsx'
  * on official portals; the selected language leads.
  */
 export default function GovIdentity() {
+  const { isMinistry } = useAuth()
+  const home = isMinistry ? '/ministry' : '/client'
   const { t, lang } = useGov()
   const other = lang === 'hi' ? STRINGS.en : STRINGS.hi
 
@@ -35,7 +38,7 @@ export default function GovIdentity() {
 
         <div className="gov-identity__portal">
           <ModeBadge />
-          <Link to="/" className="gov-identity__brand">
+          <Link to={home} className="gov-identity__brand">
             <span className="gov-identity__name">{t('portalName')}</span>
             <span className="gov-identity__tagline">{t('portalTagline')}</span>
           </Link>

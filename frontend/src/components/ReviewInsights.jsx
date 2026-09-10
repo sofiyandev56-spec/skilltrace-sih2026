@@ -41,8 +41,8 @@ export default function ReviewInsights({ data, loading }) {
     <div>
       <div className="rategrid">
         {data.questions.map((q) => (
-          <div className="rate" key={q.id} title={q.prompt}>
-            <span className="rate__label">{q.label}</span>
+          <div className="rate" key={q.id} title={t(q.promptKey)}>
+            <span className="rate__label">{t(q.labelKey)}</span>
             <span className="rate__value num">
               {q.out_of_five ?? '—'}
               <small>/5</small>

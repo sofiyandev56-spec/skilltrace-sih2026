@@ -4,74 +4,36 @@ import { useGov } from './GovContext.jsx'
 import { useAuth } from '../auth/AuthContext.jsx'
 
 export default function GovNav({ counts = { disputes: 0, followup: 0 }, onResetDemo }) {
-  const { lang, openPolicy } = useGov()
-  const { role } = useAuth()
+  const { t, openPolicy } = useGov()
+  const { role, isMinistry, logoutMinistry } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // Role-specific navigation links
-  const govItems = [
+  // Governance only. The trainee interface is a separate product reached with
+  // separate credentials, so nothing here links into it.
+  const ministryItems = [
+    { path: '/ministry', key: 'navGovDashboard', badge: null },
     {
-      path: '/',
-      labelEn: 'Governance Dashboard',
-      labelHi: 'प्रशासन डैशबोर्ड',
-      badge: null,
-    },
-    {
-      path: '/disputes',
-      labelEn: 'Disputed Records',
-      labelHi: 'विवादित रिकॉर्ड',
+      path: '/ministry/disputes',
+      key: 'navDisputedRecords',
       badge: counts.disputes > 0 ? counts.disputes : null,
       badgeClass: 'nav-badge--danger',
     },
     {
-      path: '/follow-up',
-      labelEn: 'Follow-up Queue',
-      labelHi: 'अनुवर्ती सूची',
+      path: '/ministry/follow-up',
+      key: 'navFollowupQueue',
       badge: counts.followup > 0 ? counts.followup : null,
       badgeClass: 'nav-badge--warning',
     },
-    {
-      path: '/audit',
-      labelEn: 'Audit Trail',
-      labelHi: 'अंकेक्षण अभिलेख',
-      badge: null,
-    },
-    {
-      path: '/check-in',
-      labelEn: 'Check-in Simulator',
-      labelHi: 'चेक-इन सिम्युलेटर',
-      badge: null,
-    },
-    {
-      path: '/client',
-      labelEn: 'Trainee Portal (View)',
-      labelHi: 'प्रशिक्षार्थी पोर्टल',
-      badge: null,
-    },
+    { path: '/ministry/audit', key: 'navAuditTrail', badge: null },
   ]
 
   const clientItems = [
-    {
-      path: '/client',
-      labelEn: 'My Client Dashboard',
-      labelHi: 'मेरा डैशबोर्ड',
-      badge: null,
-    },
-    {
-      path: '/consent',
-      labelEn: 'My Consent & Rights',
-      labelHi: 'सहमति एवं अधिकार',
-      badge: null,
-    },
-    {
-      path: '/check-in',
-      labelEn: 'Submit Check-in',
-      labelHi: 'चेक-इन दर्ज करें',
-      badge: null,
-    },
+    { path: '/client', key: 'navMyDashboard', badge: null },
+    { path: '/client/consent', key: 'navMyConsent', badge: null },
+    { path: '/client/check-in', key: 'navSubmitCheckin', badge: null },
   ]
 
-  const navItems = role === 'client' ? clientItems : govItems
+  const navItems = isMinistry ? ministryItems : role === 'client' ? clientItems : []
 
   return (
     <nav className="gov-nav" aria-label="Primary Navigation">
@@ -82,10 +44,10 @@ export default function GovNav({ counts = { disputes: 0, followup: 0 }, onResetD
           className="gov-nav__mobile-toggle"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           aria-expanded={mobileMenuOpen}
-          aria-label="Toggle navigation menu"
+          aria-label={t('navToggleMenu')}
         >
           <span className="gov-nav__hamburger-icon" aria-hidden="true">☰</span>
-          <span>{lang === 'hi' ? 'मेन्यू' : 'Menu'}</span>
+          <span>{t('navMenu')}</span>
         </button>
 
         {/* Links list */}
@@ -94,13 +56,13 @@ export default function GovNav({ counts = { disputes: 0, followup: 0 }, onResetD
             <li key={item.path} className="gov-nav__item">
               <NavLink
                 to={item.path}
-                end={item.path === '/' || item.path === '/client'}
+                end={item.path === '/ministry' || item.path === '/client'}
                 className={({ isActive }) =>
                   `gov-nav__link ${isActive ? 'is-active' : ''}`
                 }
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <span>{lang === 'hi' ? item.labelHi : item.labelEn}</span>
+                <span>{t(item.key)}</span>
                 {item.badge && (
                   <span className={`gov-nav__badge num ${item.badgeClass || ''}`}>
                     {item.badge}
@@ -120,7 +82,7 @@ export default function GovNav({ counts = { disputes: 0, followup: 0 }, onResetD
                 openPolicy('privacy')
               }}
             >
-              <span>{lang === 'hi' ? 'नीतियां एवं DPDPA' : 'Policies & DPDPA'}</span>
+              <span>{t('navPoliciesDPDPA')}</span>
             </button>
           </li>
         </ul>
@@ -131,11 +93,17 @@ export default function GovNav({ counts = { disputes: 0, followup: 0 }, onResetD
             type="button"
             className="gov-nav__reset-btn"
             onClick={onResetDemo}
-            title="Reset dataset to seeded initial state"
+            title={t('navResetTitle')}
           >
             <span aria-hidden="true">&#8635;</span>
-            <span>{lang === 'hi' ? 'डेमो डेटा रीसेट' : 'Reset demo data'}</span>
+            <span>{t('navResetDemo')}</span>
           </button>
+          {isMinistry ? (
+            <button type="button" className="gov-nav__reset-btn" onClick={logoutMinistry}>
+              <span aria-hidden="true">&#8594;]</span>
+              <span>{t('navSignOut')}</span>
+            </button>
+          ) : null}
         </div>
       </div>
     </nav>

@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom'
 import { useGov } from '../gov/GovContext.jsx'
 
 const DEST = {
-  role_mismatch: (f) => `/providers/${f.unit_id}`,
-  unverified: (f) => `/providers/${f.unit_id}`,
-  stale: () => '/follow-up',
-  disputes: () => '/disputes',
+  role_mismatch: (f) => `/ministry/providers/${f.unit_id}`,
+  unverified: (f) => `/ministry/providers/${f.unit_id}`,
+  stale: () => '/ministry/follow-up',
+  disputes: () => '/ministry/disputes',
 }
 
 /**

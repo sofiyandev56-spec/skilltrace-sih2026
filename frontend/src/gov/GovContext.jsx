@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { STRINGS } from './i18n.js'
+import { setFormatLocale } from '../lib/format.js'
 
 const GovContext = createContext(null)
 
@@ -12,7 +13,10 @@ export function GovProvider({ children }) {
   // Sync html attributes on change
   useEffect(() => {
     localStorage.setItem('skilltrace.lang', lang)
+    // Screen readers switch voice off this attribute, so it must track the
+    // chosen language and not just the dictionary.
     document.documentElement.setAttribute('lang', lang)
+    setFormatLocale(lang)
   }, [lang])
 
   useEffect(() => {

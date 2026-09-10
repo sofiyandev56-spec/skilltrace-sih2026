@@ -201,7 +201,7 @@ export default function Dashboard() {
                 </>
               )}
             </p>
-            <Link className="privacy__link" to="/consent">
+            <Link className="privacy__link" to="/client/consent">
               {t('consentAndRights')}
             </Link>
           </div>
@@ -361,7 +361,7 @@ export default function Dashboard() {
             eventCount={d.event_count}
             onViewEvents={() => {
               setEvidenceOpen(false)
-              navigate('/audit')
+              navigate('/ministry/audit')
             }}
             onMethodology={() => {
               setEvidenceOpen(false)

@@ -87,7 +87,7 @@ export default function ProviderDetail() {
     return (
       <div className="stack">
         <p className="empty">{t('noCentreFound', id)}</p>
-        <Link className="btn" to="/">
+        <Link className="btn" to="/ministry">
           {t('backToDashboard')}
         </Link>
       </div>
@@ -165,10 +165,10 @@ export default function ProviderDetail() {
           <h3 className="insight__title">{insight.title}</h3>
           <p className="insight__body">{insight.body}</p>
           <div className="row" style={{ gap: 8, marginTop: 12 }}>
-            <Link className="btn btn--primary" to="/follow-up">
+            <Link className="btn btn--primary" to="/ministry/follow-up">
               {insight.action}
             </Link>
-            <Link className="btn" to="/audit">
+            <Link className="btn" to="/ministry/audit">
               {t('seeSourceEvents')}
             </Link>
           </div>
@@ -244,10 +244,10 @@ export default function ProviderDetail() {
       </section>
 
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <Link className="btn" to="/">
+        <Link className="btn" to="/ministry">
           {t('backToAllCentres')}
         </Link>
-        <Link className="btn" to="/audit">
+        <Link className="btn" to="/ministry/audit">
           {t('seeSourceEvents')}
         </Link>
       </div>

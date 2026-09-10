@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext.jsx'
 import { COURSES, DISTRICTS, CATEGORIES } from '../api/mock/dataset.js'
 
 export default function AuthModal() {
+  const navigate = useNavigate()
   const {
     modalState,
     closeLogin,
@@ -11,8 +13,6 @@ export default function AuthModal() {
     verifyOtp,
     completeProfile,
     loginGoogle,
-    loginGovernment,
-    switchDemoRole,
   } = useAuth()
 
   const [phoneInput, setPhoneInput] = useState('')
@@ -183,41 +183,17 @@ export default function AuthModal() {
                 </button>
               </div>
 
-              {/* Instant One-Click Demo Access for Judges */}
-              <div className="auth-demo-picker">
-                <div className="auth-demo-picker__label">Quick Demo Access (Smart India Hackathon):</div>
-                <div className="auth-demo-picker__buttons">
-                  <button
-                    type="button"
-                    className="btn btn--sm"
-                    onClick={() => {
-                      switchDemoRole('client')
-                      closeLogin()
-                    }}
-                  >
-                    👤 Trainee / Client (Aarti Patil)
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--sm btn--primary"
-                    onClick={() => {
-                      switchDemoRole('government')
-                      closeLogin()
-                    }}
-                  >
-                    🏛️ Government Officer (MSDE)
-                  </button>
-                </div>
-              </div>
-
               <div className="auth-footer-link">
                 <span>Are you a Ministry or District official?</span>
                 <button
                   type="button"
                   className="auth-link-btn"
-                  onClick={() => setStep('gov')}
+                  onClick={() => {
+                    closeLogin()
+                    navigate('/ministry/login')
+                  }}
                 >
-                  Government Official Access &rarr;
+                  Ministry sign-in &rarr;
                 </button>
               </div>
             </div>
@@ -433,72 +409,6 @@ export default function AuthModal() {
           )}
 
           {/* ================= STEP 5: GOVERNMENT OFFICIAL ACCESS ================= */}
-          {modalState.step === 'gov' && (
-            <div className="auth-flow">
-              <div className="auth-flow__head">
-                <button
-                  type="button"
-                  className="auth-back-btn"
-                  onClick={() => setStep('select')}
-                >
-                  &larr; Back to Citizen Login
-                </button>
-                <h3>Government Official Login</h3>
-                <p>Restricted access for Ministry of Skill Development and State/District Evaluation Officers.</p>
-              </div>
-
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  loginGovernment(govEmail, govPasskey)
-                }}
-                className="auth-form"
-              >
-                <label className="field">
-                  <span className="label">Official Government Email (@gov.in / @nic.in)</span>
-                  <input
-                    type="email"
-                    value={govEmail}
-                    onChange={(e) => setGovEmail(e.target.value)}
-                    placeholder="officer@msde.gov.in"
-                    required
-                  />
-                </label>
-
-                <label className="field">
-                  <span className="label">Security Passkey / MeriPehchaan Token</span>
-                  <input
-                    type="password"
-                    value={govPasskey}
-                    onChange={(e) => setGovPasskey(e.target.value)}
-                    placeholder="Enter passkey"
-                    required
-                  />
-                </label>
-
-                <button
-                  type="submit"
-                  className="btn btn--primary btn--block btn--lg"
-                  disabled={modalState.loading}
-                >
-                  {modalState.loading ? 'Authorizing with NIC…' : 'Authenticate & Open Governance Dashboard'}
-                </button>
-
-                <div style={{ textAlign: 'center', marginTop: 10 }}>
-                  <button
-                    type="button"
-                    className="btn btn--sm btn--ghost"
-                    onClick={() => {
-                      setGovEmail('officer@msde.gov.in')
-                      setGovPasskey('MSDE@2026')
-                    }}
-                  >
-                    Auto-fill Official Demo Credentials
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
         </div>
       </div>
     </div>

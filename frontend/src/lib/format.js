@@ -1,17 +1,41 @@
+/**
+ * Display formatting, locale-aware.
+ *
+ * The active locale is module-level state set by GovProvider rather than an
+ * argument, so the ~100 call sites stay unchanged when the language switches.
+ *
+ * Digits stay Western-Arabic in every language: Indian government data pages
+ * conventionally use them, and Devanagari numerals would break the tabular
+ * alignment the dashboard tables depend on. Grouping is the Indian
+ * lakh/crore convention in all three locales, which en-IN already gives us.
+ */
+let LOCALE = 'en-IN'
+
+const MONTHS_BY_LOCALE = {
+  'en-IN': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  'hi-IN': ['जन', 'फ़र', 'मार्च', 'अप्रैल', 'मई', 'जून', 'जुल', 'अग', 'सित', 'अक्तू', 'नव', 'दिस'],
+  'mr-IN': ['जाने', 'फेब्रु', 'मार्च', 'एप्रिल', 'मे', 'जून', 'जुलै', 'ऑग', 'सप्टें', 'ऑक्टो', 'नोव्हें', 'डिसें'],
+}
+
+export function setFormatLocale(lang) {
+  LOCALE = lang === 'hi' ? 'hi-IN' : lang === 'mr' ? 'mr-IN' : 'en-IN'
+}
+
 export const pct = (v, digits = 1) =>
   v === null || v === undefined ? '—' : `${Number(v).toFixed(digits).replace(/\.0$/, '')}%`
 
-export const int = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('en-IN'))
+export const int = (v) =>
+  v === null || v === undefined ? '—' : Number(v).toLocaleString('en-IN')
 
 export const inr = (v) =>
   v === null || v === undefined ? '—' : `₹${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export function longDate(iso) {
   if (!iso) return '—'
   const d = new Date(`${iso}T00:00:00Z`)
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+  const months = MONTHS_BY_LOCALE[LOCALE] || MONTHS_BY_LOCALE['en-IN']
+  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`
 }
 
 export function daysAgo(iso, asOf) {
@@ -21,15 +45,25 @@ export function daysAgo(iso, asOf) {
   return Math.round((b - a) / 86400000)
 }
 
+const RELATIVE = {
+  'en-IN': { today: 'today', yesterday: 'yesterday', days: (n) => `${n} days ago`,
+    months: (n) => `${n} month${n === 1 ? '' : 's'} ago`, years: (y, m) => `${y} yr ${m} mo ago` },
+  'hi-IN': { today: 'आज', yesterday: 'कल', days: (n) => `${n} दिन पहले`,
+    months: (n) => `${n} माह पहले`, years: (y, m) => `${y} वर्ष ${m} माह पहले` },
+  'mr-IN': { today: 'आज', yesterday: 'काल', days: (n) => `${n} दिवसांपूर्वी`,
+    months: (n) => `${n} महिन्यांपूर्वी`, years: (y, m) => `${y} वर्षे ${m} महिने पूर्वी` },
+}
+
 export function relativeAge(iso, asOf) {
   const d = daysAgo(iso, asOf)
   if (d === null) return '—'
-  if (d < 1) return 'today'
-  if (d === 1) return 'yesterday'
-  if (d < 31) return `${d} days ago`
+  const R = RELATIVE[LOCALE] || RELATIVE['en-IN']
+  if (d < 1) return R.today
+  if (d === 1) return R.yesterday
+  if (d < 31) return R.days(d)
   const m = Math.round(d / 30.44)
-  if (m < 24) return `${m} month${m === 1 ? '' : 's'} ago`
-  return `${Math.floor(m / 12)} yr ${m % 12} mo ago`
+  if (m < 24) return R.months(m)
+  return R.years(Math.floor(m / 12), m % 12)
 }
 
 /** "Aarti Patil" -> "Aarti P." — used on the public employer page. */

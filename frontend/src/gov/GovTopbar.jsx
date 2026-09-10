@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
+import { LANGS } from './i18n.js'
 import { useGov } from './GovContext.jsx'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useDismiss } from '../lib/useApi.js'
@@ -12,14 +13,16 @@ import { useDismiss } from '../lib/useApi.js'
  * text-size steps and high-contrast toggle here are the visible part of that.
  */
 const TEXT_SIZES = [
-  { key: 'small', glyph: 'A', title: 'Decrease text size', titleHi: 'अक्षर आकार घटाएँ' },
-  { key: 'normal', glyph: 'A', title: 'Normal text size', titleHi: 'सामान्य अक्षर आकार' },
-  { key: 'large', glyph: 'A', title: 'Increase text size', titleHi: 'अक्षर आकार बढ़ाएँ' },
+  { key: 'small', glyph: 'A', labelKey: 'decrease' },
+  { key: 'normal', glyph: 'A', labelKey: 'normal' },
+  { key: 'large', glyph: 'A', labelKey: 'increase' },
 ]
 
 export default function GovTopbar() {
   const { lang, setLang, textSize, setTextSize, contrast, setContrast, t, openPolicy } = useGov()
-  const { user, isAuthenticated, role, openLogin, logout, switchDemoRole } = useAuth()
+  const { user, officer, isAuthenticated, isMinistry, openLogin, logout, logoutMinistry } = useAuth()
+  // The chip shows whichever session owns the page you are on.
+  const identity = isMinistry ? officer : user
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
   useDismiss(menuRef, () => setMenuOpen(false), menuOpen)
@@ -50,8 +53,8 @@ export default function GovTopbar() {
                   type="button"
                   className="gov-text-btn"
                   aria-pressed={textSize === size.key}
-                  aria-label={hi ? size.titleHi : size.title}
-                  title={hi ? size.titleHi : size.title}
+                  aria-label={t(size.labelKey)}
+                  title={t(size.labelKey)}
                   onClick={() => setTextSize(size.key)}
                   style={{ fontSize: 10 + i * 2 }}
                 >
@@ -73,28 +76,27 @@ export default function GovTopbar() {
             </button>
 
             <div className="gov-lang-switch" role="group" aria-label={t('language')}>
-              <button
-                type="button"
-                className="gov-lang-btn"
-                aria-pressed={lang === 'en'}
-                onClick={() => setLang('en')}
-              >
-                English
-              </button>
-              <span className="gov-lang-divider" aria-hidden="true">
-                |
-              </span>
-              <button
-                type="button"
-                className="gov-lang-btn"
-                aria-pressed={lang === 'hi'}
-                onClick={() => setLang('hi')}
-              >
-                हिन्दी
-              </button>
+              {Object.entries(LANGS).map(([code, label], i) => (
+                <React.Fragment key={code}>
+                  {i > 0 ? (
+                    <span className="gov-lang-divider" aria-hidden="true">
+                      |
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="gov-lang-btn"
+                    aria-pressed={lang === code}
+                    lang={code}
+                    onClick={() => setLang(code)}
+                  >
+                    {label}
+                  </button>
+                </React.Fragment>
+              ))}
             </div>
 
-            {isAuthenticated ? (
+            {identity ? (
               <div className="gov-user-menu-wrap" ref={menuRef}>
                 <button
                   type="button"
@@ -102,10 +104,12 @@ export default function GovTopbar() {
                   onClick={() => setMenuOpen((o) => !o)}
                   aria-expanded={menuOpen}
                 >
-                  <span className={`gov-user-chip__badge gov-user-chip__badge--${role}`}>
-                    {role === 'government' ? 'GOV' : 'CIT'}
+                  <span
+                    className={`gov-user-chip__badge gov-user-chip__badge--${isMinistry ? 'ministry' : 'client'}`}
+                  >
+                    {isMinistry ? 'GOV' : 'CIT'}
                   </span>
-                  <span className="gov-user-chip__name">{user.name}</span>
+                  <span className="gov-user-chip__name">{identity.name}</span>
                   <span className="gov-user-chip__caret" aria-hidden="true">
                     ▾
                   </span>
@@ -114,43 +118,24 @@ export default function GovTopbar() {
                 {menuOpen && (
                   <div className="gov-user-dropdown">
                     <div className="gov-user-dropdown__header">
-                      <strong>{user.name}</strong>
+                      <strong>{identity.name}</strong>
                       <span>
-                        {role === 'government'
-                          ? hi
-                            ? 'सरकारी अधिकारी'
-                            : 'Government officer'
-                          : hi
-                            ? 'नागरिक / प्रशिक्षार्थी'
-                            : 'Citizen / trainee'}
+                        {isMinistry
+                          ? `${identity.designation} · ${identity.officer_id}`
+                          : t('citizenTrainee')}
                       </span>
                     </div>
                     <div className="gov-user-dropdown__actions">
                       <button
                         type="button"
-                        className="gov-user-dropdown__item"
-                        onClick={() => {
-                          setMenuOpen(false)
-                          switchDemoRole(role === 'government' ? 'client' : 'government')
-                        }}
-                      >
-                        {role === 'government'
-                          ? hi
-                            ? 'प्रशिक्षार्थी दृश्य पर जाएँ'
-                            : 'Switch to trainee view'
-                          : hi
-                            ? 'अधिकारी दृश्य पर जाएँ'
-                            : 'Switch to officer view'}
-                      </button>
-                      <button
-                        type="button"
                         className="gov-user-dropdown__item gov-user-dropdown__item--logout"
                         onClick={() => {
                           setMenuOpen(false)
-                          logout()
+                          if (isMinistry) logoutMinistry()
+                          else logout()
                         }}
                       >
-                        {hi ? 'साइन आउट' : 'Sign out'}
+                        {t('signOut')}
                       </button>
                     </div>
                   </div>

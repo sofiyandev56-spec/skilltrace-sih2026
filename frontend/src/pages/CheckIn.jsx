@@ -76,7 +76,7 @@ export default function CheckIn() {
     },
   }
 
-  const isOfficer = role === 'government'
+  const isOfficer = role === 'ministry'
   const trainee = useMemo(
     () => (people.data || []).find((p) => p.id === traineeId) || null,
     [people.data, traineeId],

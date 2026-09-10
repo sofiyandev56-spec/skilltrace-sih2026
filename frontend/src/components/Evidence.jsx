@@ -74,7 +74,7 @@ export function EvidenceBreakdown({ evidence, note }) {
             {t(
               'basedOnRecords',
               evidence.total,
-              evidence.total === 1 ? '' : (lang === 'hi' ? '' : 's'),
+              evidence.total === 1 ? '' : (lang === 'en' ? 's' : ''),
               note || t('evidenceDecayNote'),
             )}
           </div>

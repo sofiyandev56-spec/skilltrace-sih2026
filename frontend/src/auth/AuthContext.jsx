@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { currentData } from '../api/mock/store.js'
+import * as ministryAuth from './ministryAuth.js'
 
 const AuthContext = createContext(null)
 
@@ -43,15 +44,20 @@ export const DEMO_CLIENT_USER = {
 export function AuthProvider({ children }) {
   const navigate = useNavigate()
 
-  // Initialize with stored user or default government officer for initial dashboard view
+  // The trainee session. Persisted across browser restarts — a citizen
+  // checking their own record should not have to sign in every visit.
   const [user, setUser] = useState(() => {
     try {
       const stored = localStorage.getItem(AUTH_STORAGE_KEY)
-      return stored ? JSON.parse(stored) : DEMO_GOV_USER
+      return stored ? JSON.parse(stored) : null
     } catch {
-      return DEMO_GOV_USER
+      return null
     }
   })
+
+  // The ministry session is deliberately separate: different store, different
+  // lifetime, different credentials. Holding one never implies the other.
+  const [officer, setOfficer] = useState(() => ministryAuth.readSession())
 
   // Modal flow state
   const [modalState, setModalState] = useState({
@@ -216,55 +222,44 @@ export function AuthProvider({ children }) {
   }
 
   // Government Officer Login
-  const loginGovernment = (email, passkey) => {
-    setModalState((prev) => ({ ...prev, loading: true, error: '' }))
-
-    setTimeout(() => {
-      const cleanEmail = (email || '').toLowerCase().trim()
-      // Enforce government domain check or demo official
-      const isGovDomain = cleanEmail.endsWith('.gov.in') || cleanEmail.endsWith('.nic.in') || cleanEmail === 'officer@msde.gov.in'
-
-      if (!isGovDomain) {
-        setModalState((prev) => ({
-          ...prev,
-          loading: false,
-          error: 'Access restricted: Only authorized @gov.in or @nic.in official accounts may access the Government Oversight Dashboard.',
-        }))
+  /**
+   * Ministry sign-in. Delegates the credential check to ministryAuth, which is
+   * the only module that can see the officer list — this function never
+   * decides on its own that someone is an officer.
+   */
+  const loginMinistry = (officerId, password) =>
+    new Promise((resolve) => {
+      const result = ministryAuth.authenticate(officerId, password)
+      if (!result.ok) {
+        resolve(result)
         return
       }
+      ministryAuth.saveSession(result.officer)
+      setOfficer(result.officer)
+      resolve(result)
+    })
 
-      setUser({
-        ...DEMO_GOV_USER,
-        email: cleanEmail,
-        name: cleanEmail.includes('officer') ? 'Dr. S. K. Sharma, IES' : cleanEmail.split('@')[0].toUpperCase(),
-      })
-      setModalState((prev) => ({ ...prev, isOpen: false, loading: false }))
-      navigate('/')
-    }, 500)
+  const logoutMinistry = () => {
+    ministryAuth.clearSession()
+    setOfficer(null)
+    navigate('/ministry/login', { replace: true })
   }
 
-  // Quick switch for demo testing
-  const switchDemoRole = (role) => {
-    if (role === 'government') {
-      setUser(DEMO_GOV_USER)
-      navigate('/')
-    } else {
-      setUser(DEMO_CLIENT_USER)
-      navigate('/client')
-    }
-  }
-
+  /** Ends the trainee session only. The ministry session has its own exit. */
   const logout = () => {
     setUser(null)
-    navigate('/')
+    navigate('/client', { replace: true })
   }
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        officer,
         isAuthenticated: !!user,
-        role: user?.role || null,
+        isMinistry: !!officer,
+        // Role is derived from which session actually exists, never chosen.
+        role: officer ? 'ministry' : user ? 'client' : null,
         modalState,
         openLogin,
         closeLogin,
@@ -273,8 +268,8 @@ export function AuthProvider({ children }) {
         verifyOtp,
         completeProfile,
         loginGoogle,
-        loginGovernment,
-        switchDemoRole,
+        loginMinistry,
+        logoutMinistry,
         logout,
       }}
     >

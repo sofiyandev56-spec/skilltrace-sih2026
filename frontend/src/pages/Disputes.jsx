@@ -308,7 +308,7 @@ export default function Disputes() {
         </div>
         {unassigned > 0 && tab === 'open' ? (
           <span className="small muted">
-            {t('openRecords', unassigned, unassigned === 1 ? '' : (lang === 'hi' ? '' : 's'))}
+            {t('openRecords', unassigned, unassigned === 1 ? '' : (lang === 'en' ? 's' : ''))}
           </span>
         ) : null}
       </div>
