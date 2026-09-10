@@ -282,20 +282,38 @@ export function getProviders(filters = {}) {
 
       const tiers = emptyTiers()
       let verified = 0
+      let roleMatched = 0
+      let placedEver = 0
+      let stale = 0
       for (const t of own) {
-        const c = classify(data.eventsByTrainee[t.id])
+        const evs = data.eventsByTrainee[t.id] || []
+        if (evs.some((e) => e.what_happened === 'placed')) placedEver += 1
+        const c = classify(evs)
+        if (c.trust === 'stale') stale += 1
         if (c.bucket === 'employed') {
           verified += 1
           tiers[c.trust] += 1
+          const def = COURSES.find((x) => x.name === t.course)
+          if (def && c.event?.job_role === def.intended_role) roleMatched += 1
         }
       }
+
+      const share = (n) => (own.length ? Math.round((n / own.length) * 100) : 0)
+      const reported = share(placedEver)
+      const verifiedPct = share(verified)
 
       return {
         id: p.id,
         name: p.name,
         district: p.district,
         certified_count: own.length,
-        verified_placement_pct: own.length ? Math.round((verified / own.length) * 100) : 0,
+        headline_placement_pct: reported,
+        verified_placement_pct: verifiedPct,
+        // The distance a centre's reported success falls when the 3-month rule
+        // is applied. This is the column that ranks centres honestly.
+        proof_gap: reported - verifiedPct,
+        role_match_pct: share(roleMatched),
+        stale_pct: share(stale),
         retention_3mo: retentionAt(90),
         retention_6mo: retentionAt(180),
         retention_12mo: retentionAt(365),
@@ -770,4 +788,122 @@ export function getProvider(id, filters = {}) {
       .sort((a, b) => b.certified - a.certified),
     as_of: AS_OF,
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* GET /attention — what an officer should actually do today           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Ranked, actionable findings rather than a wall of statistics.
+ *
+ * Each finding names the unit at fault, quantifies it, and states the action.
+ * Nothing here is derived from a single weak signal: every threshold is set so
+ * a centre with a handful of trainees cannot top the list on noise alone.
+ */
+export function getAttention(filters = {}) {
+  const data = store.currentData()
+  const cohort = applyFilters(data.trainees, filters)
+  const raw = store.rawData()
+  const findings = []
+
+  const byProvider = {}
+  for (const t of cohort) (byProvider[t.provider_id] ||= []).push(t)
+
+  for (const [pid, own] of Object.entries(byProvider)) {
+    if (own.length < 40) continue // too small to draw a conclusion from
+    const provider = raw.providers.find((p) => p.id === pid)
+    if (!provider) continue
+
+    let employed = 0
+    let roleMatched = 0
+    let stale = 0
+    let placedEver = 0
+    const tiers = emptyTiers()
+
+    for (const t of own) {
+      const evs = data.eventsByTrainee[t.id] || []
+      if (evs.some((e) => e.what_happened === 'placed')) placedEver += 1
+      const c = classify(evs)
+      if (c.trust === 'stale') stale += 1
+      if (c.bucket === 'employed') {
+        employed += 1
+        tiers[c.trust] += 1
+        const def = COURSES.find((x) => x.name === t.course)
+        if (def && c.event?.job_role === def.intended_role) roleMatched += 1
+      }
+    }
+
+    const share = (n) => Math.round((n / own.length) * 1000) / 10
+    const ev = tierPercentages(tiers)
+    const placedPct = share(placedEver)
+    const rolePct = share(roleMatched)
+    const stalePct = share(stale)
+
+    if (placedPct >= 50 && rolePct < placedPct * 0.15) {
+      findings.push({
+        id: `role-${pid}`,
+        kind: 'role_mismatch',
+        severity: 2,
+        headline: 'High placement, low role relevance',
+        unit: provider.name,
+        unit_id: pid,
+        district: provider.district,
+        detail: `${placedPct}% of this centre's trainees report a placement, but only ${rolePct}% are working in the occupation the course trains for.`,
+        action: 'Review course-to-employer alignment',
+        metric: rolePct,
+      })
+    }
+
+    if (stalePct >= 55) {
+      findings.push({
+        id: `stale-${pid}`,
+        kind: 'stale',
+        severity: 1,
+        headline: 'Stale records above threshold',
+        unit: provider.name,
+        unit_id: pid,
+        district: provider.district,
+        detail: `${stalePct}% of this centre's trainees have produced no reliable signal in the current tracking period. Its outcome rates rest on a shrinking base.`,
+        action: 'Send cohort to the follow-up queue',
+        metric: stalePct,
+      })
+    }
+
+    if (employed >= 10 && (ev.high || 0) < 20) {
+      findings.push({
+        id: `unverified-${pid}`,
+        kind: 'unverified',
+        severity: 3,
+        headline: 'Outcomes rest on self-reporting',
+        unit: provider.name,
+        unit_id: pid,
+        district: provider.district,
+        detail: `Only ${ev.high || 0}% of this centre's employment outcomes carry independent evidence. A centre cannot be the sole source of its own score.`,
+        action: 'Request employer confirmations',
+        metric: ev.high || 0,
+      })
+    }
+  }
+
+  // Disputes are the sharpest call on an officer's time — always surface them.
+  const openDisputes = data.disputes.filter((x) => x.status !== 'resolved' && !x.assigned_officer_id)
+  if (openDisputes.length) {
+    findings.push({
+      id: 'disputes',
+      kind: 'disputes',
+      severity: 0,
+      headline: 'Disputed records awaiting an officer',
+      unit: `${openDisputes.length} record${openDisputes.length === 1 ? '' : 's'}`,
+      unit_id: null,
+      district: null,
+      detail:
+        'The employer and the trainee disagree on these outcomes. Neither claim is counted in any figure on this dashboard until an officer establishes the facts.',
+      action: 'Assign a field officer',
+      metric: openDisputes.length,
+    })
+  }
+
+  findings.sort((a, b) => a.severity - b.severity || b.metric - a.metric)
+  return { findings: findings.slice(0, 6), as_of: AS_OF }
 }

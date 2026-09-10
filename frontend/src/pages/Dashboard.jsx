@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { subscribe } from '../api/mock/store.js'
 import { useApi } from '../lib/useApi.js'
 import { int, longDate, pct } from '../lib/format.js'
 import FilterBar from '../components/FilterBar.jsx'
-import StatCard from '../components/StatCard.jsx'
 import CompositionBar from '../components/CompositionBar.jsx'
 import Funnel from '../components/Funnel.jsx'
+import StoryHeader from '../components/StoryHeader.jsx'
+import NeedsAttention from '../components/NeedsAttention.jsx'
+import EvidenceDrawer from '../components/EvidenceDrawer.jsx'
 import EvidenceFooter from '../components/EvidenceFooter.jsx'
 import ReviewInsights from '../components/ReviewInsights.jsx'
 import ProviderTable from '../components/ProviderTable.jsx'
@@ -54,6 +57,7 @@ export default function Dashboard() {
   const provs = useApi(() => api.getProviders(filters), [filtersKey, nonce])
   const gap = useApi(() => api.getSkillGap(filters), [filtersKey, nonce])
   const feedback = useApi(() => api.getReviewInsights(filters), [filtersKey, nonce])
+  const attention = useApi(() => api.getAttention(filters), [filtersKey, nonce])
 
   const refresh = useCallback(() => {
     setExternalChange(null)
@@ -118,6 +122,9 @@ export default function Dashboard() {
   const cohortLabel =
     [filters.cohort, filters.course, filters.district].filter(Boolean).join(' · ') || 'All cohorts'
 
+  const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const navigate = useNavigate()
+
   return (
     <div className="stack">
       {externalChange && (
@@ -152,110 +159,50 @@ export default function Dashboard() {
       ) : (
         <>
           {/* The contrast the whole system exists to expose. */}
+          <StoryHeader
+            d={d}
+            delta={deltas?.employed}
+            onOpenEvidence={() => setEvidenceOpen(true)}
+          />
+
           <div className="panel">
-            <div className="panel__body" style={{ display: 'flex', gap: 28, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="panel__head">
               <div>
-                <div className="label">Reported placement rate</div>
-                <div className="num" style={{ fontSize: 25, fontWeight: 680, color: 'var(--text-faint)' }}>
-                  {pct(d.headline_placement_pct)}
+                <div className="panel__title">What needs attention</div>
+                <div className="panel__hint">
+                  Ranked by how much of an officer&rsquo;s time they are worth. Centres with fewer
+                  than 40 trainees in this slice are excluded — too small to draw a conclusion from.
                 </div>
-                <div className="small muted">Anyone with a placement on record ({int(d.headline_placement_count)})</div>
               </div>
-              <div style={{ fontSize: 22, color: 'var(--border-strong)' }} aria-hidden="true">→</div>
-              <div>
-                <div className="label" style={{ color: 'var(--accent-dark)' }}>Verified employment rate</div>
-                <div className="num" style={{ fontSize: 25, fontWeight: 680, color: 'var(--tier-high)' }}>
-                  {pct(d.outcomes.employed.pct)}
-                </div>
-                <div className="small muted">Still at the same employer after 3+ months ({int(d.outcomes.employed.count)})</div>
-              </div>
-              <div className="callout-rule" style={{ flex: '1 1 320px' }}>
-                <span aria-hidden="true" style={{ fontSize: 15 }}>⚖</span>
-                <span>
-                  <b>{pct(Math.round((d.headline_placement_pct - d.outcomes.employed.pct) * 10) / 10)}</b> of
-                  this cohort was reported as placed but cannot be shown to have held the job for three
-                  months. SkillTrace never reports those as employment.
-                </span>
-              </div>
+            </div>
+            <div className="panel__body">
+              <NeedsAttention findings={attention.data?.findings} loading={attention.loading} />
             </div>
           </div>
 
-          {d.consent.withdrawn > 0 && (
-            <div className="note">
-              <b className="num">{d.consent.withdrawn}</b> trainee record
-              {d.consent.withdrawn === 1 ? ' has' : 's have'} been excluded from every figure on this page
-              because consent was withdrawn. Denominator is now{' '}
-              <b className="num">{int(d.consent.included)}</b> of {int(d.consent.total)}.
-            </div>
-          )}
-
-          {/* ---- the five summary cards ---- */}
-          <div className="grid grid--5">
-            <StatCard
-              tone="total"
-              label="Total trainees"
-              value={int(d.total_trainees)}
-              sub={`Certified up to ${longDate(d.as_of)}`}
-              evidence={d.evidence_totals}
-              note="Evidence mix across every outcome record in this slice."
-              delta={deltas?.total}
-              changed={Boolean(deltas?.total)}
-              cohort={cohortLabel}
-              population={int(d.total_trainees)}
-              eventCount={d.event_count}
-            />
-            <StatCard
-              label="Employed"
-              value={pct(d.outcomes.employed.pct, 1).replace('%', '')}
-              unit="%"
-              sub={`${int(d.outcomes.employed.count)} trainees · 3+ months at one employer`}
-              evidence={d.outcomes.employed.evidence}
-              note="Only placements confirmed 3+ months later at the same employer are counted here."
-              delta={deltas?.employed}
-              changed={Boolean(deltas?.employed)}
-              cohort={cohortLabel}
-              population={int(d.total_trainees)}
-              eventCount={d.event_count}
-            />
-            <StatCard
-              label="Self-employed"
-              value={pct(d.outcomes.self_employed.pct, 1).replace('%', '')}
-              unit="%"
-              sub={`${int(d.outcomes.self_employed.count)} trainees running their own work`}
-              evidence={d.outcomes.self_employed.evidence}
-              note="Bank-verified income is treated as the strongest evidence of self-employment."
-              delta={deltas?.self_employed}
-              changed={Boolean(deltas?.self_employed)}
-              cohort={cohortLabel}
-              population={int(d.total_trainees)}
-              eventCount={d.event_count}
-            />
-            <StatCard
-              label="Apprentice"
-              value={pct(d.outcomes.apprentice.pct, 1).replace('%', '')}
-              unit="%"
-              sub={`${int(d.outcomes.apprentice.count)} trainees in apprenticeships`}
-              evidence={d.outcomes.apprentice.evidence}
-              note="Apprenticeships are tracked separately from employment — a stipend is not a wage."
-              delta={deltas?.apprentice}
-              changed={Boolean(deltas?.apprentice)}
-              cohort={cohortLabel}
-              population={int(d.total_trainees)}
-              eventCount={d.event_count}
-            />
-            <StatCard
-              label="No data"
-              value={pct(d.outcomes.no_data.pct, 1).replace('%', '')}
-              unit="%"
-              sub={`${int(d.outcomes.no_data.count)} trainees never responded`}
-              evidence={d.outcomes.no_data.evidence}
-              note="We report this as unknown rather than assuming an outcome. These names feed the follow-up queue."
-              delta={deltas?.no_data}
-              changed={Boolean(deltas?.no_data)}
-              cohort={cohortLabel}
-              population={int(d.total_trainees)}
-              eventCount={d.event_count}
-            />
+          <div className="privacy" role="note">
+            <span className="privacy__icon" aria-hidden="true">🔒</span>
+            <p className="privacy__text">
+              <strong>
+                {int(d.consent.included)} of {int(d.consent.total)} records included.
+              </strong>{' '}
+              {d.consent.withdrawn > 0 ? (
+                <>
+                  <b className="num">{d.consent.withdrawn}</b> trainee
+                  {d.consent.withdrawn === 1 ? ' has' : 's have'} withdrawn consent and{' '}
+                  {d.consent.withdrawn === 1 ? 'is' : 'are'} excluded from every figure above — not
+                  anonymised, not retained in the denominator, removed.
+                </>
+              ) : (
+                <>
+                  Every trainee counted here has active consent. Withdrawal takes effect on the next
+                  render of this page, with no administrative review.
+                </>
+              )}
+            </p>
+            <Link className="privacy__link" to="/consent">
+              Consent &amp; data rights →
+            </Link>
           </div>
 
           <div className="panel">
@@ -401,6 +348,26 @@ export default function Dashboard() {
               <ReviewInsights data={feedback.data} loading={feedback.loading} />
             </div>
           </div>
+
+          <EvidenceDrawer
+            open={evidenceOpen}
+            onClose={() => setEvidenceOpen(false)}
+            title="Verified employment rate"
+            value={pct(d.outcomes.employed.pct)}
+            definition="A trainee counts as employed only once there is evidence they were still with the same employer three or more months after the placement. A bare placement record is never counted here."
+            cohort={cohortLabel}
+            population={int(d.total_trainees)}
+            evidence={d.outcomes.employed.evidence}
+            eventCount={d.event_count}
+            onViewEvents={() => {
+              setEvidenceOpen(false)
+              navigate('/audit')
+            }}
+            onMethodology={() => {
+              setEvidenceOpen(false)
+              navigate('/consent')
+            }}
+          />
         </>
       )}
     </div>

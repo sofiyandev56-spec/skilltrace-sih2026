@@ -127,7 +127,7 @@ export default function CheckIn() {
   const followUp = primary ? FOLLOW_UP[primary.key] : null
 
   return (
-    <div className="stack">
+    <div className="stack checkin">
       <div className="note">
         <b>How this reaches the trainee.</b> A check-in is sent as an SMS or an automated voice call every
         three months — never through a third-party messaging service. This screen submits the same record so

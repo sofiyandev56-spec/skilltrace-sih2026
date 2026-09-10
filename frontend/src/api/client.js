@@ -108,6 +108,8 @@ export const api = {
 
   getSkillGap: (f = {}) => request(`/skill-gap${qs(f)}`, {}, () => mock.getSkillGap(f)),
 
+  getAttention: (f = {}) => request(`/attention${qs(f)}`, {}, () => mock.getAttention(f)),
+
   getAuditLog: (f = {}) => request(`/audit${qs(f)}`, {}, () => mock.getAuditLog(f)),
 
   /* disputes */

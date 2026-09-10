@@ -9,10 +9,12 @@ const COLUMNS = [
   { key: 'name', label: 'Training centre', align: 'left' },
   { key: 'district', label: 'District', align: 'left' },
   { key: 'certified_count', label: 'Certified', align: 'right' },
-  { key: 'verified_placement_pct', label: 'Verified placement', align: 'right', bar: true },
+  { key: 'headline_placement_pct', label: 'Reported', align: 'right' },
+  { key: 'verified_placement_pct', label: 'Verified', align: 'right', bar: true },
+  { key: 'proof_gap', label: 'Unproven gap', align: 'right' },
   { key: 'retention_3mo', label: 'Retention 3mo', align: 'right' },
-  { key: 'retention_6mo', label: 'Retention 6mo', align: 'right' },
-  { key: 'retention_12mo', label: 'Retention 12mo', align: 'right' },
+  { key: 'role_match_pct', label: 'Role match', align: 'right' },
+  { key: 'stale_pct', label: 'Stale', align: 'right' },
 ]
 
 const PctCell = ({ value }) =>
@@ -21,6 +23,23 @@ const PctCell = ({ value }) =>
   ) : (
     <span className="num">{value}%</span>
   )
+
+/**
+ * A cell that goes saffron once it crosses the threshold where an officer
+ * should look. Colour is never the only signal: the value is always readable,
+ * and crossing cells also carry a title explaining why they are marked.
+ */
+const FlagCell = ({ value, over, under, why }) => {
+  if (value === null || value === undefined) {
+    return <span className="faint">n/a</span>
+  }
+  const flagged = (over !== undefined && value >= over) || (under !== undefined && value <= under)
+  return (
+    <span className={`num ${flagged ? 'cell--flag' : ''}`} title={flagged ? why : undefined}>
+      {value}%{flagged ? <i className="cell__mark" aria-label=", needs attention"> ●</i> : null}
+    </span>
+  )
+}
 
 /** Centre ranking. Every column sorts; verified placement is the default order. */
 export default function ProviderTable({ providers = [], onSelect, activeProvider }) {
@@ -77,7 +96,7 @@ export default function ProviderTable({ providers = [], onSelect, activeProvider
               onClick={() => onSelect?.(activeProvider === p.id ? '' : p.id)}
               style={{
                 cursor: onSelect ? 'pointer' : undefined,
-                background: activeProvider === p.id ? '#fbf1ec' : undefined,
+                background: activeProvider === p.id ? 'var(--accent-wash)' : undefined,
               }}
             >
               <td className="rank">{i + 1}</td>
@@ -89,6 +108,7 @@ export default function ProviderTable({ providers = [], onSelect, activeProvider
               </td>
               <td>{p.district}</td>
               <td className="right num">{int(p.certified_count)}</td>
+              <td className="right num faint">{p.headline_placement_pct}%</td>
               <td className="right">
                 <div className="cellbar">
                   <EvidenceBadge trust={dominantTier(p.evidence).key} small />
@@ -106,9 +126,28 @@ export default function ProviderTable({ providers = [], onSelect, activeProvider
                   </span>
                 </div>
               </td>
+              <td className="right">
+                <FlagCell
+                  value={p.proof_gap}
+                  over={45}
+                  why="Most of this centre's reported placements cannot be shown to have lasted three months."
+                />
+              </td>
               <td className="right"><PctCell value={p.retention_3mo} /></td>
-              <td className="right"><PctCell value={p.retention_6mo} /></td>
-              <td className="right"><PctCell value={p.retention_12mo} /></td>
+              <td className="right">
+                <FlagCell
+                  value={p.role_match_pct}
+                  under={5}
+                  why="Almost no one from this centre is working in the occupation they trained for."
+                />
+              </td>
+              <td className="right">
+                <FlagCell
+                  value={p.stale_pct}
+                  over={55}
+                  why="This centre's outcome rates rest on a shrinking base of responding trainees."
+                />
+              </td>
             </tr>
           ))}
         </tbody>

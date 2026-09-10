@@ -12,6 +12,65 @@ const SOURCE_ICON = {
   field_officer: '🧭',
 }
 
+const WHAT_LABEL = {
+  placed: 'Placement reported',
+  still_working: 'Still working confirmed',
+  left_job: 'Left the job',
+  self_employed: 'Self-employment reported',
+  apprentice: 'Apprenticeship reported',
+  not_working: 'Not working reported',
+}
+
+/**
+ * The whole trainee timeline, with the event being inspected marked in place.
+ *
+ * This is the append-only claim made checkable rather than asserted. If an
+ * earlier record was later contradicted, both are still here and in order — a
+ * judge can see for themselves that nothing was rewritten to make the
+ * headline figure look better.
+ */
+function TraineeLedger({ traineeId, currentEventId }) {
+  const { data, loading } = useApi(() => api.getTrainee(traineeId), [traineeId])
+  if (loading) return <p className="small muted">Loading this trainee&rsquo;s full history…</p>
+  const events = data?.events || []
+  if (!events.length) return null
+
+  return (
+    <div className="ledger">
+      <p className="ledger__head">
+        Full record for {traineeId} — {events.length} event{events.length === 1 ? '' : 's'}, oldest
+        first. Nothing here has been edited or removed.
+      </p>
+      <ol className="ledger__list">
+        {events.map((e, i) => {
+          const superseded = i < events.length - 1
+          return (
+            <li
+              className={`ledger__item ${e.id === currentEventId ? 'is-current' : ''}`}
+              key={e.id}
+            >
+              <span className="ledger__seq num" aria-hidden="true">
+                {i + 1}
+              </span>
+              <span className="ledger__when num">{longDate(e.date)}</span>
+              <span className="ledger__what">
+                {WHAT_LABEL[e.what_happened] || e.what_happened}
+                {e.employer ? <span className="muted"> · {e.employer}</span> : null}
+              </span>
+              <EvidenceBadge trust={e.trust_level} small />
+              {superseded ? (
+                <span className="ledger__state">superseded, retained</span>
+              ) : (
+                <span className="ledger__state ledger__state--live">current</span>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+    </div>
+  )
+}
+
 function EventDetail({ event, onClose }) {
   if (!event) return null
   return (
@@ -77,6 +136,8 @@ function EventDetail({ event, onClose }) {
         This record is append-only. If it is later contradicted, a new event is added above it — this
         row is never edited or deleted, so the figure it supports can always be re-derived.
       </p>
+
+      <TraineeLedger traineeId={event.trainee_id} currentEventId={event.id} />
     </Modal>
   )
 }

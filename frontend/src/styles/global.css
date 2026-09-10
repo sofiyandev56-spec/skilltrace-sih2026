@@ -3,16 +3,17 @@
    Authoritative, sovereign, accessible. Tabular figures, WCAG 2.1 AA.
    ================================================================== */
 :root {
-  /* Sovereign Indian Gov Palette */
-  --navy: #14202e;
-  --navy-800: #0f1924;
-  --navy-700: #1a2b3d;
-  --navy-500: #2d435c;
-  --navy-300: #4d6582;
+  /* Sovereign Indian Gov Palette — Deep Navy is the trust colour */
+  --navy: #123B63;
+  --navy-800: #0C2A47;
+  --navy-700: #16456F;
+  --navy-500: #2C5A85;
+  --navy-300: #5A7FA3;
 
-  --accent: #b4623a;
-  --accent-dark: #8f4b2b;
-  --accent-wash: #fbf1ec;
+  /* Saffron marks one thing only: something an officer can act on. */
+  --accent: #E67E22;
+  --accent-dark: #A65308;
+  --accent-wash: #FFF4E6;
 
   /* National Tricolor Constants */
   --saffron: #FF9933;
@@ -29,14 +30,14 @@
 
   /* Neutral Surface & Typography Tokens */
   --bg: #ffffff;
-  --bg-subtle: #f6f8fa;
-  --bg-sunken: #eef1f4;
-  --border: #dfe4e9;
-  --border-strong: #c3cbd3;
+  --bg-subtle: #F4F8FC;
+  --bg-sunken: #E8EFF7;
+  --border: #D9E2EC;
+  --border-strong: #BCCCDC;
 
-  --text: #14202e;
-  --text-muted: #55636f;
-  --text-faint: #8a949e;
+  --text: #102A43;
+  --text-muted: #627D98;
+  --text-faint: #829AB1;
 
   --font: 'Noto Sans', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont,
     'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -977,17 +978,42 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 }
 .checkin-done h3 { font-size: 15.5px; margin-bottom: 4px; }
 
+/* Trainee-facing controls. Sized for someone answering on a low-end phone,
+   possibly one-handed, possibly reading the second language on the screen —
+   so the target is well above the 44px floor and the label never truncates. */
 .choice {
-  display: flex; align-items: center; gap: 11px;
-  padding: 13px 15px; border: 1px solid var(--border-strong);
+  display: flex; align-items: center; gap: 14px;
+  min-height: 60px;
+  padding: 15px 18px; border: 2px solid var(--border-strong);
   background: #fff; cursor: pointer; width: 100%; text-align: left;
-  font-size: 14px; border-radius: var(--radius);
+  font-size: 16px; line-height: 1.35; border-radius: var(--radius);
 }
 .choice:hover { border-color: var(--navy-500); background: var(--bg-subtle); }
+.choice:focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; }
 .choice.is-picked { border-color: var(--navy); background: var(--bg-subtle); box-shadow: inset 0 0 0 1px var(--navy); }
-.choice__mark { width: 16px; height: 16px; border: 1px solid var(--border-strong); border-radius: 50%; flex: none; display: grid; place-items: center; }
+.choice__mark {
+  width: 24px; height: 24px; border: 2px solid var(--border-strong);
+  border-radius: 50%; flex: none; display: grid; place-items: center;
+}
 .choice.is-picked .choice__mark { border-color: var(--navy); }
-.choice.is-picked .choice__mark::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--navy); }
+.choice.is-picked .choice__mark::after { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--navy); }
+
+@media (max-width: 720px) {
+  .choice {
+    min-height: 72px;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 18px 20px;
+    gap: 16px;
+  }
+  .choice__mark { width: 28px; height: 28px; }
+  .choice.is-picked .choice__mark::after { width: 14px; height: 14px; }
+
+  /* The question itself has to be as prominent as the answers. */
+  .fieldset__legend { font-size: 18px; line-height: 1.35; }
+  .checkin .btn { min-height: 56px; font-size: 17px; width: 100%; }
+  .checkin .row { flex-direction: column; align-items: stretch; gap: 10px; }
+}
 
 /* ==================================================================
    Follow-up queue
@@ -2589,3 +2615,276 @@ html[data-contrast="high"] .insight { background: #fff; }
 }
 .tbl__link:hover { text-decoration: underline; }
 .tbl__link:focus-visible { outline: 2px solid var(--tier-medium); outline-offset: 2px; }
+
+/* ==================================================================
+   Story header — the 30-second read
+   Reported rate, verified rate, and the gap named between them.
+   ================================================================== */
+.story {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--navy);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.story__main {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 26px 28px 20px;
+}
+
+.story__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+.story__label--strong { color: var(--tier-high); }
+
+.story__fig {
+  font-size: clamp(2.6rem, 6vw, 4rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.95;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+.story__fig--weak { color: var(--text-faint); }
+.story__fig--strong { color: var(--tier-high); }
+
+.story__fig--btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+  display: block;
+  text-align: left;
+  border-bottom: 2px dashed var(--tier-high);
+}
+.story__fig--btn:hover { opacity: 0.82; }
+.story__fig--btn:focus-visible { outline: 3px solid var(--navy); outline-offset: 3px; }
+
+.story__sub {
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  margin: 0;
+  max-width: 34ch;
+}
+
+.story__arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  color: var(--border-strong);
+}
+.story__arrow span {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* The gap is the argument, so it gets the actionable colour. */
+.story__gap {
+  margin: 0;
+  padding: 14px 28px;
+  background: var(--accent-wash);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.story__gap strong { color: var(--accent-dark); }
+
+.story__rail {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0;
+  padding: 0;
+}
+.story__cell {
+  padding: 16px 28px;
+  border-right: 1px solid var(--border);
+}
+.story__cell:last-child { border-right: 0; }
+.story__cell dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.story__cell dd {
+  margin: 0 0 3px;
+  font-size: 1.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--navy);
+  line-height: 1;
+}
+.story__note { font-size: 0.74rem; color: var(--text-muted); display: block; }
+
+@media (max-width: 900px) {
+  .story__main { grid-template-columns: 1fr; gap: 18px; padding: 20px; }
+  .story__arrow { flex-direction: row; gap: 10px; }
+  .story__arrow svg { transform: rotate(90deg); }
+  .story__gap { padding: 14px 20px; }
+  .story__rail { grid-template-columns: repeat(2, 1fr); }
+  .story__cell { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .story__cell:nth-child(2n) { border-right: 0; }
+}
+@media (max-width: 480px) {
+  .story__rail { grid-template-columns: 1fr; }
+  .story__cell { border-right: 0; }
+}
+
+html[data-contrast="high"] .story__gap { background: #fff; }
+
+/* ==================================================================
+   Needs attention — one unit, one number, one action
+   ================================================================== */
+.att {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  background: var(--bg);
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.att--urgent { border-left-color: var(--tier-conflict); }
+
+.att__kind {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: var(--accent-dark);
+  margin: 0;
+}
+.att--urgent .att__kind { color: var(--tier-conflict); }
+
+.att__unit { margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--navy); }
+.att__district { font-weight: 400; color: var(--text-muted); font-size: 0.82rem; }
+.att__detail { margin: 0; font-size: 0.82rem; color: var(--text); flex: 1; }
+
+.att__action {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--navy);
+  text-decoration: none;
+  align-self: flex-start;
+}
+.att__action:hover { text-decoration: underline; }
+.att__action:focus-visible { outline: 2px solid var(--navy); outline-offset: 3px; }
+
+@media (max-width: 900px) { .attention { grid-template-columns: 1fr; } }
+
+.story__figrow { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.story__hint {
+  font-size: 0.72rem;
+  color: var(--tier-high);
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+/* Threshold flag in the centre table. Saffron = an officer should look;
+   the dot means the same thing for anyone who cannot see the colour. */
+.cell--flag { color: var(--accent-dark); font-weight: 700; }
+.cell__mark { font-style: normal; font-size: 0.7em; vertical-align: 1px; }
+
+/* ==================================================================
+   Privacy strip — the consent claim, always on screen
+   ================================================================== */
+.privacy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--tier-medium);
+  border-radius: var(--radius);
+}
+.privacy__icon { font-size: 1rem; flex: none; }
+.privacy__text { margin: 0; font-size: 0.83rem; color: var(--text); flex: 1; }
+.privacy__text strong { color: var(--navy); }
+.privacy__link {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--tier-medium);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.privacy__link:hover { text-decoration: underline; }
+.privacy__link:focus-visible { outline: 2px solid var(--tier-medium); outline-offset: 3px; }
+
+@media (max-width: 720px) {
+  .privacy { flex-wrap: wrap; }
+  .privacy__text { flex: 1 1 100%; }
+}
+
+/* ==================================================================
+   Trainee ledger — the append-only claim, made checkable
+   ================================================================== */
+.ledger {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.ledger__head { font-size: 0.78rem; color: var(--text-muted); margin: 0 0 10px; }
+.ledger__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+
+.ledger__item {
+  display: grid;
+  grid-template-columns: 22px 90px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-subtle);
+  font-size: 0.78rem;
+  border-left: 3px solid var(--border-strong);
+}
+.ledger__item.is-current {
+  background: #eef4fb;
+  border-left-color: var(--tier-medium);
+  box-shadow: inset 0 0 0 1px var(--tier-medium);
+}
+
+.ledger__seq {
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  text-align: right;
+}
+.ledger__when { color: var(--text-muted); white-space: nowrap; }
+.ledger__what { min-width: 0; color: var(--text); }
+
+.ledger__state {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.ledger__state--live { color: var(--tier-high); }
+
+@media (max-width: 620px) {
+  .ledger__item { grid-template-columns: 1fr auto; gap: 4px 8px; }
+  .ledger__seq { display: none; }
+  .ledger__when { grid-column: 1 / -1; }
+  .ledger__what { grid-column: 1 / -1; }
+}
