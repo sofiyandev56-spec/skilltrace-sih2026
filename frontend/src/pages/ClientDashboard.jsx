@@ -1,357 +1,407 @@
-import React, { useState } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { api } from '../api/client.js'
+import { useApi } from '../lib/useApi.js'
 import { useAuth } from '../auth/AuthContext.jsx'
+import { useToast } from '../components/Toast.jsx'
+import QuickReview from '../components/QuickReview.jsx'
 import { EvidenceBadge } from '../components/Evidence.jsx'
-import { inr } from '../lib/format.js'
+import { BUCKET_META } from '../lib/evidence.js'
+import { inr, longDate, relativeAge } from '../lib/format.js'
+import { AS_OF, daysBetween } from '../api/mock/dataset.js'
+
+const addDays = (iso, n) => {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * The trainee's journey, derived from their actual event trail rather than
+ * written out by hand — so what they see is the same record the government
+ * sees, including the point at which the three-month rule was satisfied.
+ */
+function buildJourney(record) {
+  if (!record) return []
+  const events = record.events || []
+  const placement = events.find((e) => e.what_happened === 'placed')
+  const confirmation = placement
+    ? events.find(
+        (e) =>
+          e.what_happened === 'still_working' &&
+          e.employer === placement.employer &&
+          daysBetween(placement.date, e.date) >= 75,
+      )
+    : null
+  const twelveMonth = placement
+    ? events.find(
+        (e) =>
+          e.what_happened === 'still_working' &&
+          e.employer === placement.employer &&
+          daysBetween(placement.date, e.date) >= 350,
+      )
+    : null
+
+  const steps = [
+    {
+      key: 'training',
+      title: 'Training completed',
+      desc: record.provider_name || 'Government training centre',
+      date: record.cohort ? `Cohort ${record.cohort}` : null,
+      state: 'done',
+    },
+    {
+      key: 'certified',
+      title: 'Course certified',
+      desc: `${record.course} · NSQF assessment passed`,
+      date: null,
+      state: 'done',
+    },
+  ]
+
+  steps.push({
+    key: 'placed',
+    title: 'Placed with an employer',
+    desc: placement ? placement.employer : 'Not yet placed',
+    date: placement ? longDate(placement.date) : null,
+    state: placement ? 'done' : 'upcoming',
+  })
+
+  const dueAt = placement ? addDays(placement.date, 90) : null
+  steps.push({
+    key: 'three_month',
+    title: '3-month milestone',
+    desc: confirmation
+      ? 'Confirmed at the same employer — this is what counts as employment'
+      : 'Employment counts only once you pass three months at the same employer',
+    date: confirmation ? longDate(confirmation.date) : dueAt ? `Due ${longDate(dueAt)}` : null,
+    state: confirmation ? 'done' : placement ? 'pending' : 'upcoming',
+    trust: confirmation?.trust_level,
+  })
+
+  const twelveDue = placement ? addDays(placement.date, 365) : null
+  steps.push({
+    key: 'twelve_month',
+    title: '12-month retention',
+    desc: twelveMonth ? 'Still with the same employer after a year' : 'Long-term stability check',
+    date: twelveMonth ? longDate(twelveMonth.date) : twelveDue ? `Due ${longDate(twelveDue)}` : null,
+    state: twelveMonth ? 'done' : 'upcoming',
+    trust: twelveMonth?.trust_level,
+  })
+
+  // Highlight where the trainee actually stands: a checkpoint that is due but
+  // not yet met takes precedence, otherwise the furthest one reached.
+  const pendingAt = steps.findIndex((s) => s.state === 'pending')
+  if (pendingAt === -1) {
+    const lastDone = steps.map((s) => s.state).lastIndexOf('done')
+    if (lastDone !== -1) steps[lastDone].state = 'current'
+  }
+
+  return steps
+}
+
+/** One clear thing to do, chosen from the trainee's actual situation. */
+function nextAction({ record, reviewDone, journey }) {
+  if (!record) return null
+  const last = record.events?.[record.events.length - 1]
+  const staleDays = last ? daysBetween(last.date, AS_OF) : null
+
+  if (!reviewDone) {
+    return {
+      tone: 'action',
+      title: 'Complete your training review',
+      body: 'Five quick questions about your course. It takes about a minute and shapes how the next batch is trained.',
+      cta: null,
+    }
+  }
+  if (record.bucket === 'not_working') {
+    return {
+      tone: 'attention',
+      title: 'Update your employment information',
+      body: 'Our record says you are not currently working. If that has changed, tell us — it takes two taps.',
+      cta: { to: '/check-in', label: 'Submit a check-in' },
+    }
+  }
+  if (record.bucket === 'awaiting_confirmation') {
+    const step = journey.find((s) => s.key === 'three_month')
+    return {
+      tone: 'waiting',
+      title: 'Your 3-month check is coming up',
+      body: `You have been placed, but employment is only counted once you pass three months at the same employer. ${step?.date || ''}`.trim(),
+      cta: { to: '/check-in', label: 'Confirm early' },
+    }
+  }
+  if (staleDays !== null && staleDays > 120) {
+    return {
+      tone: 'attention',
+      title: 'Confirm you are still working',
+      body: `We last heard from you ${relativeAge(last.date, AS_OF)}. A quick confirmation keeps your record active.`,
+      cta: { to: '/check-in', label: 'Submit a check-in' },
+    }
+  }
+  const twelve = journey.find((s) => s.key === 'twelve_month')
+  const twelveReached = twelve && twelve.state !== 'upcoming'
+  return {
+    tone: 'ontrack',
+    title: 'You are on track',
+    body: twelveReached
+      ? 'Every milestone on your record is complete and independently verified. Nothing needs your attention — we will check in again in a few months.'
+      : `Nothing needs your attention. Your next milestone is 12-month retention${twelve?.date ? `, ${twelve.date.replace(/^Due /, 'due ')}` : ''}.`,
+    cta: null,
+  }
+}
+
+const QUICK_ACTIONS = [
+  { to: '/check-in', label: 'Submit a check-in', desc: 'Tell us your current work status', icon: '✓' },
+  { to: '/consent', label: 'My consent & rights', desc: 'See and withdraw what you shared', icon: '🔒' },
+]
+
+/** A record an officer can look at when previewing what a trainee sees. */
+const PREVIEW_TRAINEE = 'TRN-0001'
 
 export default function ClientDashboard() {
-  const { user } = useAuth()
-  const [downloadSuccess, setDownloadSuccess] = useState(false)
-  const [checkinSuccess, setCheckinSuccess] = useState(false)
+  const { user, role } = useAuth()
+  const toast = useToast()
+  // A government officer opening the trainee portal is previewing it, not
+  // looking at their own record — they have no skilling record of their own.
+  const previewing = role !== 'client'
+  const traineeId = previewing ? PREVIEW_TRAINEE : user?.id || PREVIEW_TRAINEE
 
-  const trainee = user || {
-    id: 'TRN-0001',
-    name: 'Aarti Patil',
-    phone: '+91 91256 71886',
-    course: 'General Duty Assistant',
-    district: 'Nashik',
-    category: 'General',
-    employer: 'Sanjeevani Hospital',
-    job_role: 'Healthcare Assistant',
-    monthly_salary: 14000,
-    verified_status: 'employed',
-    verified_milestone: '3+ months at same employer',
-    certification_date: '15 Jan 2025',
-    placement_date: '28 Jan 2025',
+  const recordReq = useApi(() => api.getTrainee(traineeId), [traineeId])
+  const reviewReq = useApi(() => api.getReview(traineeId), [traineeId])
+
+  const record = recordReq.data
+  const journey = useMemo(() => buildJourney(record), [record])
+  const reviewDone = Boolean(reviewReq.data?.completed)
+  const action = useMemo(
+    () => nextAction({ record, reviewDone, journey }),
+    [record, reviewDone, journey],
+  )
+
+  if (recordReq.loading && !record) return <div className="skeleton" style={{ height: 420 }} />
+  if (!record) {
+    return (
+      <div className="panel">
+        <div className="empty">
+          <h4>No record found</h4>
+          <p>We could not find a skilling record for this account.</p>
+        </div>
+      </div>
+    )
   }
 
-  const handleDownloadWallet = () => {
-    setDownloadSuccess(true)
-    setTimeout(() => setDownloadSuccess(false), 3000)
-  }
-
-  const handleQuickCheckin = () => {
-    setCheckinSuccess(true)
-    setTimeout(() => setCheckinSuccess(false), 3000)
-  }
+  const outcome = BUCKET_META[record.bucket] || BUCKET_META.no_data
+  const firstName = record.name.split(' ')[0]
+  const placement = record.events?.find((e) => e.what_happened === 'placed')
+  const latestPay = [...(record.events || [])].reverse().find((e) => e.salary)?.salary
 
   return (
-    <div className="client-dashboard-wrap stack">
-      {/* 1. Trainee Sovereign Identity & Profile Hero */}
-      <div className="client-hero">
-        <div className="client-hero__main">
-          <div className="client-hero__avatar" aria-hidden="true">
-            {trainee.name.split(' ').map((n) => n[0]).join('')}
-          </div>
-          <div className="client-hero__details">
-            <div className="client-hero__badge-row">
-              <span className="client-hero__id num">{trainee.id}</span>
-              <span className="tier tier--high">● Verified Record</span>
-              <span className="mode mode--live"><span className="mode__dot" /> Citizen Wallet</span>
-            </div>
-            <h2>{trainee.name}</h2>
-            <div className="client-hero__sub">
-              <span>{trainee.course}</span> &middot; <span>{trainee.district}, Maharashtra</span> &middot;{' '}
-              <span>Category: {trainee.category || 'General'}</span>
-            </div>
-          </div>
+    <div className="client">
+      {previewing ? (
+        <p className="note" style={{ marginBottom: -14 }}>
+          <b>Preview.</b> You are signed in as a government officer, so this shows a sample trainee’s portal
+          ({record.name}, <span className="mono">{record.id}</span>) exactly as they would see it.
+        </p>
+      ) : null}
+
+      {/* ---- 1. who you are, and where you stand ---- */}
+      <section className="client-top" aria-labelledby="client-welcome">
+        <div className="client-top__intro">
+          <p className="client-top__eyebrow">
+            <span className="mono">{record.id}</span> · {record.course}
+          </p>
+          <h1 id="client-welcome">Welcome back, {firstName}</h1>
+          <p className="client-top__line">
+            {record.district}, Maharashtra · Certified under the National Skills Qualifications Framework
+          </p>
         </div>
 
-        <div className="client-hero__status-card">
-          <div className="client-hero__status-label">CURRENT VERIFIED STATUS</div>
-          <div className="client-hero__status-val">Employed (3+ Months)</div>
-          <div className="client-hero__status-emp">
-            <strong>{trainee.employer}</strong> &mdash; {trainee.job_role || 'Healthcare Assistant'}
-          </div>
-          <div className="client-hero__status-meta">
-            Monthly Earnings: <strong className="num">{inr(trainee.monthly_salary || 14000)}</strong> / mo
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Three-Month Rule Milestone Timeline */}
-      <div className="panel">
-        <div className="panel__head">
-          <div className="panel__title">Longitudinal Milestone Progress (The 3-Month Rule)</div>
-          <div className="panel__right">
-            <span className="small muted">MSDE Accountability Standard</span>
-          </div>
-        </div>
-        <div className="panel__body">
-          <div className="callout-rule" style={{ marginBottom: 16 }}>
-            <div>
-              <strong>Why 3 Months Matter:</strong> Under Government of India skilling guidelines, a bare placement
-              letter is never counted as an outcome. Your employment record was verified only after{' '}
-              <strong>3 consecutive months</strong> of verified bank income and employer confirmation at{' '}
-              <strong>{trainee.employer}</strong>.
-            </div>
-          </div>
-
-          <div className="client-milestones">
-            <div className="milestone milestone--done">
-              <div className="milestone__dot">&#10003;</div>
-              <div className="milestone__content">
-                <div className="milestone__title">Enrolment &amp; Training</div>
-                <div className="milestone__desc">Nashik Industrial Training Wing</div>
-                <div className="milestone__date">Oct 2024 &ndash; Jan 2025</div>
+        <div className="client-status">
+          <span className="client-status__label">Your verified status</span>
+          <span className="client-status__value" style={{ color: outcome.color }}>
+            {outcome.label}
+          </span>
+          {record.bucket === 'employed' && (
+            <span className="client-status__note">3+ months at the same employer</span>
+          )}
+          <dl className="client-status__facts">
+            {placement?.employer ? (
+              <div>
+                <dt>Employer</dt>
+                <dd>{placement.employer}</dd>
               </div>
-            </div>
-
-            <div className="milestone milestone--done">
-              <div className="milestone__dot">&#10003;</div>
-              <div className="milestone__content">
-                <div className="milestone__title">Course Certified</div>
-                <div className="milestone__desc">NSQF Level 3 Assessment Passed</div>
-                <div className="milestone__date">15 Jan 2025</div>
+            ) : null}
+            {record.event?.job_role ? (
+              <div>
+                <dt>Role</dt>
+                <dd>{record.event.job_role}</dd>
               </div>
-            </div>
-
-            <div className="milestone milestone--done">
-              <div className="milestone__dot">&#10003;</div>
-              <div className="milestone__content">
-                <div className="milestone__title">Placed at Employer</div>
-                <div className="milestone__desc">{trainee.employer}</div>
-                <div className="milestone__date">28 Jan 2025</div>
+            ) : null}
+            {latestPay ? (
+              <div>
+                <dt>Monthly earnings</dt>
+                <dd className="num">{inr(latestPay)}</dd>
               </div>
-            </div>
-
-            <div className="milestone milestone--active">
-              <div className="milestone__dot">&#9733;</div>
-              <div className="milestone__content">
-                <div className="milestone__title">3-Month Milestone &middot; Verified</div>
-                <div className="milestone__desc">Confirmed by bank recurring pattern &amp; employer</div>
-                <div className="milestone__date" style={{ color: 'var(--tier-high)', fontWeight: 700 }}>
-                  28 Apr 2025 (Achieved)
-                </div>
-              </div>
-            </div>
-
-            <div className="milestone milestone--upcoming">
-              <div className="milestone__dot">5</div>
-              <div className="milestone__content">
-                <div className="milestone__title">12-Month Retention</div>
-                <div className="milestone__desc">Economic stability tracking</div>
-                <div className="milestone__date">Jan 2026</div>
-              </div>
-            </div>
+            ) : null}
+          </dl>
+          <div className="client-status__evidence">
+            <EvidenceBadge trust={record.trust} small />
+            <span className="faint small">
+              Last confirmed {relativeAge(record.event?.date, AS_OF)}
+            </span>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 3. Verified Work-History Wallet & Digital Credential */}
-      <div className="grid grid--2">
-        <div className="panel">
-          <div className="panel__head">
-            <div className="panel__title">Verified Work-History Wallet (Digital Credential)</div>
-            <div className="panel__right">
-              <span className="tier tier--high">● Government Tamper-Proof</span>
-            </div>
+      {/* ---- 2. the one thing to do next ---- */}
+      {action ? (
+        <section className={`nextup nextup--${action.tone}`} aria-labelledby="nextup-title">
+          <span className="nextup__flag">
+            {action.tone === 'ontrack' ? 'On track' : action.tone === 'waiting' ? 'Coming up' : 'Your next step'}
+          </span>
+          <h2 id="nextup-title">{action.title}</h2>
+          <p>{action.body}</p>
+          {action.cta ? (
+            <Link className="btn btn--accent" to={action.cta.to}>
+              {action.cta.label}
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* ---- 3. the journey ---- */}
+      <section className="client-section" aria-labelledby="journey-title">
+        <div className="client-section__head">
+          <h2 id="journey-title">Your skill journey</h2>
+          <p>
+            Employment is counted only after three months at the same employer — a placement letter on its own
+            is never recorded as an outcome.
+          </p>
+        </div>
+
+        <ol className="journey">
+          {journey.map((s) => (
+            <li key={s.key} className={`journey__step is-${s.state}`}>
+              <span className="journey__marker" aria-hidden="true">
+                {s.state === 'done' || s.state === 'current' ? '✓' : s.state === 'pending' ? '•' : ''}
+              </span>
+              <div className="journey__body">
+                <span className="journey__title">
+                  {s.title}
+                  {s.state === 'current' ? <span className="journey__now">Verified</span> : null}
+                </span>
+                <span className="journey__desc">{s.desc}</span>
+                {s.date ? <span className="journey__date">{s.date}</span> : null}
+                {s.trust ? <EvidenceBadge trust={s.trust} small /> : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* ---- 4. feedback ---- */}
+      <section className="client-section" aria-labelledby="review-section-title">
+        <div className="client-section__head">
+          <h2 id="review-section-title">Your training feedback</h2>
+          <p>Ratings are pooled across trainees before any officer sees them.</p>
+        </div>
+        <QuickReview traineeId={traineeId} courseName={record.course} />
+      </section>
+
+      {/* ---- 5. actions & records ---- */}
+      <div className="client-split">
+        <section className="client-section" aria-labelledby="actions-title">
+          <div className="client-section__head">
+            <h2 id="actions-title">Quick actions</h2>
           </div>
-          <div className="panel__body">
-            <div className="wallet-card">
-              <div className="wallet-card__header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <img src="/emblem.svg" alt="Emblem" style={{ height: 32, width: 'auto' }} />
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#1a2a6c' }}>
-                      Skill India Digital Hub &middot; MSDE
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--navy)' }}>
-                      Verified Post-Training Credential
-                    </div>
-                  </div>
-                </div>
-                <div className="wallet-card__qr">
-                  {/* Stylized QR Code placeholder */}
-                  <svg viewBox="0 0 40 40" width="40" height="40" aria-label="Credential QR Verification Code">
-                    <rect width="40" height="40" fill="#fff" />
-                    <rect x="4" y="4" width="12" height="12" fill="#000" />
-                    <rect x="6" y="6" width="8" height="8" fill="#fff" />
-                    <rect x="8" y="8" width="4" height="4" fill="#000" />
-                    <rect x="24" y="4" width="12" height="12" fill="#000" />
-                    <rect x="26" y="6" width="8" height="8" fill="#fff" />
-                    <rect x="28" y="8" width="4" height="4" fill="#000" />
-                    <rect x="4" y="24" width="12" height="12" fill="#000" />
-                    <rect x="6" y="26" width="8" height="8" fill="#fff" />
-                    <rect x="8" y="28" width="4" height="4" fill="#000" />
-                    <rect x="20" y="20" width="6" height="6" fill="#000" />
-                    <rect x="28" y="28" width="8" height="8" fill="#000" />
-                  </svg>
-                </div>
-              </div>
-
-              <div className="wallet-card__grid">
-                <div>
-                  <span className="wallet-card__label">Candidate Name</span>
-                  <strong>{trainee.name}</strong>
-                </div>
-                <div>
-                  <span className="wallet-card__label">Trainee ID</span>
-                  <strong className="num">{trainee.id}</strong>
-                </div>
-                <div>
-                  <span className="wallet-card__label">Verified Employer</span>
-                  <strong>{trainee.employer}</strong>
-                </div>
-                <div>
-                  <span className="wallet-card__label">Verified Role</span>
-                  <strong>{trainee.job_role || 'Healthcare Assistant'}</strong>
-                </div>
-                <div>
-                  <span className="wallet-card__label">Assessed Course</span>
-                  <strong>{trainee.course}</strong>
-                </div>
-                <div>
-                  <span className="wallet-card__label">Verification Tier</span>
-                  <strong style={{ color: 'var(--tier-high)' }}>Tier A &mdash; Bank &amp; Employer Corroborated</strong>
-                </div>
-              </div>
-
-              <div className="wallet-card__footer">
-                <span>Cryptographically verifiable via National Skills Qualifications Framework</span>
-                <span className="num">ID: SIDH-2026-TRN0001</span>
-              </div>
-            </div>
-
-            <div className="row" style={{ marginTop: 14, gap: 10 }}>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={handleDownloadWallet}
-              >
-                &#128190; Download Verified Credential PDF
-              </button>
-              <Link to="/consent" className="btn btn--ghost">
-                Manage Data Permissions &rarr;
+          <div className="quickacts">
+            {QUICK_ACTIONS.map((a) => (
+              <Link key={a.to} to={a.to} className="quickact">
+                <span className="quickact__icon" aria-hidden="true">
+                  {a.icon}
+                </span>
+                <span>
+                  <strong>{a.label}</strong>
+                  <span>{a.desc}</span>
+                </span>
               </Link>
-            </div>
-
-            {downloadSuccess && (
-              <div className="note" style={{ marginTop: 10, background: '#eef8f2', borderColor: '#146c43', color: '#146c43' }}>
-                &#10003; Verifiable digital credential successfully prepared and verified against MSDE registry!
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 4. Trainee Incentives & Career Pathways */}
-        <div className="panel">
-          <div className="panel__head">
-            <div className="panel__title">Unlocked Opportunities &amp; Self-Benefits</div>
-            <div className="panel__right">
-              <span className="small muted">4 Pathways Active</span>
-            </div>
-          </div>
-          <div className="panel__body">
-            <p className="small muted" style={{ marginBottom: 14 }}>
-              Because your 3-month employment is independently verified, you have unlocked priority access to
-              national skilling pathways:
-            </p>
-
-            <div className="client-benefits">
-              <div className="benefit-item">
-                <div className="benefit-item__icon">&#128640;</div>
-                <div className="benefit-item__text">
-                  <strong>SIDH Job Exchange Priority</strong>
-                  <p>Verified alumni profiles are surfaced in the top tier for enterprise recruitment drives.</p>
-                </div>
-                <span className="tier tier--high tier--sm">Active</span>
-              </div>
-
-              <div className="benefit-item">
-                <div className="benefit-item__icon">&#127891;</div>
-                <div className="benefit-item__text">
-                  <strong>NSQF Fast-Track to Next Level</strong>
-                  <p>Eligible to enrol in Level 4 Healthcare Supervisor course without re-submitting KYC or documents.</p>
-                </div>
-                <span className="tier tier--high tier--sm">Eligible</span>
-              </div>
-
-              <div className="benefit-item">
-                <div className="benefit-item__icon">&#128737;</div>
-                <div className="benefit-item__text">
-                  <strong>e-Shram Social Security Linkage</strong>
-                  <p>Streamlined accidental insurance coverage &amp; pension entitlements via Ministry of Labour integration.</p>
-                </div>
-                <span className="tier tier--high tier--sm">Linked</span>
-              </div>
-
-              <div className="benefit-item">
-                <div className="benefit-item__icon">&#127974;</div>
-                <div className="benefit-item__text">
-                  <strong>MUDRA Alternate Credit Readiness</strong>
-                  <p>Your 3-month verified income history serves as non-collateral cash-flow evidence for enterprise microloans.</p>
-                </div>
-                <span className="tier tier--medium tier--sm">Score 780</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. Quarterly Check-in & Communications Log */}
-      <div className="panel">
-        <div className="panel__head">
-          <div className="panel__title">My Check-in Log &middot; Automated SMS &amp; WhatsApp Reports</div>
-          <div className="panel__right">
+            ))}
             <button
               type="button"
-              className="btn btn--sm btn--primary"
-              onClick={handleQuickCheckin}
+              className="quickact"
+              onClick={() =>
+                toast.push('Credential prepared', {
+                  detail: 'Your verified skill record has been generated and checked against the registry.',
+                })
+              }
             >
-              &#9993; Submit Quarterly Status Update
+              <span className="quickact__icon" aria-hidden="true">
+                ⭳
+              </span>
+              <span>
+                <strong>Download skill record</strong>
+                <span>Verified credential as a PDF</span>
+              </span>
             </button>
           </div>
-        </div>
-        <div className="panel__body">
-          {checkinSuccess && (
-            <div className="note" style={{ marginBottom: 14, background: '#eef8f2', borderColor: '#146c43', color: '#146c43' }}>
-              &#10003; Status check-in recorded! Your record will remain active without escalation.
-            </div>
-          )}
+        </section>
 
-          <div className="table-wrap">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Cycle</th>
-                  <th>Channel</th>
-                  <th>Declared Status</th>
-                  <th>Employer / Detail</th>
-                  <th>Evidence Tier</th>
-                  <th>Timestamp</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><strong>2026-Q1</strong></td>
-                  <td>WhatsApp Business</td>
-                  <td>Employed (Retained)</td>
-                  <td>{trainee.employer} (Same salary)</td>
-                  <td><EvidenceBadge trust="high" /></td>
-                  <td className="muted num">28 Apr 2026</td>
-                </tr>
-                <tr>
-                  <td><strong>2025-Q4</strong></td>
-                  <td>WhatsApp Business</td>
-                  <td>Employed (3-Month Check)</td>
-                  <td>{trainee.employer} (₹14,000)</td>
-                  <td><EvidenceBadge trust="high" /></td>
-                  <td className="muted num">28 Jan 2026</td>
-                </tr>
-                <tr>
-                  <td><strong>2025-Q3</strong></td>
-                  <td>SMS Two-Tap</td>
-                  <td>Initial Placement</td>
-                  <td>{trainee.employer}</td>
-                  <td><EvidenceBadge trust="medium" /></td>
-                  <td className="muted num">28 Oct 2025</td>
-                </tr>
-              </tbody>
-            </table>
+        <section className="client-section" aria-labelledby="record-title">
+          <div className="client-section__head">
+            <h2 id="record-title">Your verified record</h2>
           </div>
-        </div>
+          <div className="credential">
+            <div className="credential__top">
+              <img src="/state-emblem.png" alt="" className="credential__emblem" aria-hidden="true" />
+              <div>
+                <span className="credential__issuer">Ministry of Skill Development and Entrepreneurship</span>
+                <span className="credential__kind">Verified post-training record</span>
+              </div>
+            </div>
+            <dl className="credential__grid">
+              <div>
+                <dt>Name</dt>
+                <dd>{record.name}</dd>
+              </div>
+              <div>
+                <dt>Trainee ID</dt>
+                <dd className="mono">{record.id}</dd>
+              </div>
+              <div>
+                <dt>Course</dt>
+                <dd>{record.course}</dd>
+              </div>
+              <div>
+                <dt>Outcome</dt>
+                <dd>{outcome.label}</dd>
+              </div>
+            </dl>
+            <div className="credential__foot">
+              <EvidenceBadge trust={record.trust} small />
+              <span className="faint small">
+                {record.events?.length || 0} record{record.events?.length === 1 ? '' : 's'} held about you
+              </span>
+              <Link to="/consent" className="credential__link">
+                Manage or withdraw →
+              </Link>
+            </div>
+          </div>
+        </section>
       </div>
+
+      {/* ---- 6. help ---- */}
+      <section className="client-help" aria-labelledby="help-title">
+        <div>
+          <h2 id="help-title">Need help with your record?</h2>
+          <p>
+            If anything here is wrong — the employer, the dates, your status — tell us and a field officer will
+            look into it. Correcting your record never affects your certificate.
+          </p>
+        </div>
+        <Link to="/check-in" className="btn">
+          Report a problem
+        </Link>
+      </section>
     </div>
   )
 }

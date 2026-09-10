@@ -10,7 +10,6 @@
 import * as mock from './mock/handlers.js'
 
 export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
-export const EMPLOYER_CONFIRM_PATH = import.meta.env.VITE_EMPLOYER_CONFIRM_PATH || '/checkin'
 const FORCE_MOCK = import.meta.env.VITE_FORCE_MOCK === '1'
 const TIMEOUT_MS = 2500
 
@@ -112,6 +111,23 @@ export const api = {
   resolveDispute: (id, body) =>
     request(`/disputes/${id}/resolve`, { method: 'POST', body }, () => mock.resolveDispute(id, body)),
 
+  getFieldOfficers: () => request('/field-officers', {}, () => mock.getFieldOfficers()),
+
+  assignFieldOfficer: (id, body) =>
+    request(`/disputes/${id}/assign-officer`, { method: 'POST', body }, () =>
+      mock.assignFieldOfficer(id, body),
+    ),
+
+  /* post-training review */
+  getReview: (traineeId) =>
+    request(`/reviews/${traineeId}`, {}, () => mock.getReview(traineeId)),
+
+  submitReview: (body) =>
+    request('/reviews', { method: 'POST', body }, () => mock.submitReview(body)),
+
+  getReviewInsights: (f = {}) =>
+    request(`/reviews/insights${qs(f)}`, {}, () => mock.getReviewInsights(f)),
+
   /* consent */
   listConsents: () => request('/consent', {}, () => mock.listConsents()),
 
@@ -124,16 +140,6 @@ export const api = {
 
   /* check-in */
   postCheckin: (body) => request('/checkin', { method: 'POST', body }, () => mock.postCheckin(body)),
-
-  /**
-   * Employer confirmation. Endpoint is swappable in one place —
-   * set VITE_EMPLOYER_CONFIRM_PATH once the backend team decides whether this
-   * is a dedicated route or just /checkin with source: "employer".
-   */
-  postEmployerConfirm: (body) =>
-    request(EMPLOYER_CONFIRM_PATH, { method: 'POST', body: { ...body, source: 'employer' } }, () =>
-      mock.postCheckin({ ...body, source: 'employer' }),
-    ),
 
   /* follow-up queue */
   getFollowupQueue: () => request('/followup-queue', {}, () => mock.getFollowupQueue()),

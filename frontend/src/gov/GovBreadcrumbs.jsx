@@ -8,7 +8,6 @@ const ROUTE_SECTIONS = {
   '/disputes': { sectionEn: 'Oversight', sectionHi: 'निगरानी' },
   '/follow-up': { sectionEn: 'Oversight', sectionHi: 'निगरानी' },
   '/check-in': { sectionEn: 'Data Collection', sectionHi: 'डेटा संग्रह' },
-  '/employer': { sectionEn: 'Data Collection', sectionHi: 'डेटा संग्रह' },
   '/consent': { sectionEn: 'Trainee Rights', sectionHi: 'प्रशिक्षार्थी अधिकार' },
 }
 

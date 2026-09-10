@@ -102,7 +102,7 @@ export default function AuthModal() {
           <div className="auth-modal__branding">
             <div className="auth-modal__org">
               <img
-                src="/ashoka-chakra.svg"
+                src="/state-emblem.png"
                 alt="Ashoka Chakra"
                 className="auth-modal__chakra"
                 width="20"

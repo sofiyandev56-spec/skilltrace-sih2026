@@ -37,12 +37,6 @@ export default function GovNav({ counts = { disputes: 0, followup: 0 }, onResetD
       badge: null,
     },
     {
-      path: '/employer',
-      labelEn: 'Employer Verification',
-      labelHi: 'नियोक्ता सत्यापन',
-      badge: null,
-    },
-    {
       path: '/client',
       labelEn: 'Trainee Portal (View)',
       labelHi: 'प्रशिक्षार्थी पोर्टल',

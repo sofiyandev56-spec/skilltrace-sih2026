@@ -1,42 +1,42 @@
 import { Link } from 'react-router-dom'
 import { useGov } from './GovContext.jsx'
+import { STRINGS } from './i18n.js'
 import ModeBadge from '../components/ModeBadge.jsx'
 
 /**
- * The masthead: who the government is, which ministry owns the portal, and
- * what the portal is called.
+ * The masthead: the State Emblem, the government, the ministry that owns the
+ * portal, and the portal's own identity — in that order of precedence, which
+ * is how an official Indian government header is read.
  *
- * The mark used here is a neutral prototype placeholder. The State Emblem of
- * India is deliberately not displayed — its use is restricted by the State
- * Emblem of India (Prohibition of Improper Use) Act, 2005, and a hackathon
- * project holds no authorisation to display it.
+ * Both language forms of the government's name are shown at once, as they are
+ * on official portals; the selected language leads.
  */
 export default function GovIdentity() {
-  const { t } = useGov()
+  const { t, lang } = useGov()
+  const other = lang === 'hi' ? STRINGS.en : STRINGS.hi
 
   return (
     <div className="gov-identity">
       <div className="gov-identity__inner">
         <div className="gov-identity__org">
-          <img src="/emblem.svg" alt="" className="gov-identity__emblem" aria-hidden="true" />
+          <img
+            src="/state-emblem.png"
+            alt="State Emblem of India"
+            className="gov-identity__emblem"
+            width="211"
+            height="360"
+          />
           <div className="gov-identity__titles">
-            <span className="gov-identity__country">
-              <img src="/ashoka-chakra.svg" alt="" className="gov-identity__chakra" aria-hidden="true" />
-              {t('govOfIndia')}
-            </span>
+            <span className="gov-identity__country">{t('govOfIndia')}</span>
+            <span className="gov-identity__country-alt">{other.govOfIndia}</span>
             <span className="gov-identity__ministry">{t('ministry')}</span>
           </div>
         </div>
 
         <div className="gov-identity__portal">
           <ModeBadge />
-          <Link to="/" className="gov-identity__brand" style={{ textDecoration: 'none' }}>
-            <span className="gov-identity__name">
-              <span className="gov-identity__badge" aria-hidden="true">
-                ST
-              </span>
-              {t('portalName')}
-            </span>
+          <Link to="/" className="gov-identity__brand">
+            <span className="gov-identity__name">{t('portalName')}</span>
             <span className="gov-identity__tagline">{t('portalTagline')}</span>
           </Link>
         </div>

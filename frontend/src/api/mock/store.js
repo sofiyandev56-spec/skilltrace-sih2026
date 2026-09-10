@@ -15,8 +15,10 @@ const KEY = 'skilltrace.overlay.v1'
 const emptyOverlay = () => ({
   withdrawn: {},      // trainee_id -> ISO date
   disputes: {},       // dispute_id -> { status, resolved_at, resolution, note }
-  extraEvents: [],    // events created by check-ins / employer confirmations
-  assignments: {},    // trainee_id -> { officer, assigned_at }
+  extraEvents: [],    // events created by check-ins
+  assignments: {},    // trainee_id -> { officer, assigned_at }  (follow-up queue)
+  officers: {},       // dispute_id -> { assigned_officer_id, assigned_at, assigned_by }
+  reviews: {},        // trainee_id -> post-training review submitted this session
   seq: 0,
 })
 
@@ -95,7 +97,14 @@ export function currentData() {
 
   const disputes = base.disputes
     .filter((d) => !withdrawn[d.trainee_id])
-    .map((d) => ({ ...d, ...(overlay.disputes[d.id] || {}) }))
+    .map((d) => ({ ...d, ...(overlay.disputes[d.id] || {}), ...(overlay.officers[d.id] || {}) }))
+
+  // Seeded reviews, plus anything submitted during this session. A trainee who
+  // withdraws consent takes their feedback with them.
+  const reviews = [
+    ...base.reviews.filter((r) => !withdrawn[r.trainee_id] && !overlay.reviews[r.trainee_id]),
+    ...Object.values(overlay.reviews).filter((r) => !withdrawn[r.trainee_id]),
+  ]
 
   const consents = base.consents.map((c) =>
     withdrawn[c.trainee_id]
@@ -115,6 +124,7 @@ export function currentData() {
     disputes,
     consents,
     followupQueue,
+    reviews,
     eventsByTrainee: groupEventsByTrainee(events),
     consentTotals: {
       total: base.trainees.length,
@@ -151,6 +161,18 @@ export function resolveDispute(disputeId, patch) {
   initStore()
   overlay.disputes[disputeId] = { ...(overlay.disputes[disputeId] || {}), ...patch }
   notify({ reason: 'dispute_resolved', disputeId })
+}
+
+export function assignFieldOfficer(disputeId, patch) {
+  initStore()
+  overlay.officers[disputeId] = { ...(overlay.officers[disputeId] || {}), ...patch }
+  notify({ reason: 'officer_assigned_to_dispute', disputeId })
+}
+
+export function saveReview(review) {
+  initStore()
+  overlay.reviews[review.trainee_id] = review
+  notify({ reason: 'review_submitted', traineeId: review.trainee_id })
 }
 
 export function addEvent(event) {

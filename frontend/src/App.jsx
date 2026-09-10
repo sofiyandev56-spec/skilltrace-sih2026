@@ -10,6 +10,7 @@ import GovBreadcrumbs from './gov/GovBreadcrumbs.jsx'
 import GovFooter from './gov/GovFooter.jsx'
 import GovPolicyModal from './gov/GovPolicyModal.jsx'
 import AuthModal from './auth/AuthModal.jsx'
+import { ToastProvider } from './components/Toast.jsx'
 import ProtectedRoute from './auth/ProtectedRoute.jsx'
 import { ROUTE_META } from './routes.js'
 import Dashboard from './pages/Dashboard.jsx'
@@ -17,7 +18,6 @@ import Disputes from './pages/Disputes.jsx'
 import Consent from './pages/Consent.jsx'
 import CheckIn from './pages/CheckIn.jsx'
 import FollowupQueue from './pages/FollowupQueue.jsx'
-import EmployerConfirm from './pages/EmployerConfirm.jsx'
 import ClientDashboard from './pages/ClientDashboard.jsx'
 
 /** Keeps the browser tab title in step with the page and the language. */
@@ -56,7 +56,6 @@ function useNavCounts() {
 
 export default function App() {
   const counts = useNavCounts()
-  const { pathname } = useLocation()
   useDocumentTitle()
 
   const resetDemo = () => {
@@ -64,12 +63,9 @@ export default function App() {
     window.location.reload()
   }
 
-  // The public employer page is reached from a link with no login, so it gets
-  // the government chrome but neither the internal navigation nor breadcrumbs.
-  const isPublic = pathname.startsWith('/employer')
-
   return (
-    <div className="gov-layout-root">
+    <ToastProvider>
+      <div className="gov-layout-root">
       <div className="gov-tricolor" aria-hidden="true">
         <span className="gov-tricolor__saffron" />
         <span className="gov-tricolor__white" />
@@ -79,19 +75,11 @@ export default function App() {
       <GovTopbar />
       <GovIdentity />
 
-      {!isPublic && (
-        <>
-          <GovNav counts={counts} onResetDemo={resetDemo} />
-          <GovBreadcrumbs />
-        </>
-      )}
+      <GovNav counts={counts} onResetDemo={resetDemo} />
+      <GovBreadcrumbs />
 
       <main className="gov-main-content" id="main-content" tabIndex={-1}>
         <Routes>
-          {/* Public — an employer follows a link and confirms without an account. */}
-          <Route path="/employer" element={<EmployerConfirm />} />
-          <Route path="/employer/:token" element={<EmployerConfirm />} />
-
           {/* Administrative oversight — accredited officers only. */}
           <Route
             path="/"
@@ -156,8 +144,9 @@ export default function App() {
         <span className="gov-tricolor__green" />
       </div>
 
-      <GovPolicyModal />
-      <AuthModal />
-    </div>
+        <GovPolicyModal />
+        <AuthModal />
+      </div>
+    </ToastProvider>
   )
 }
