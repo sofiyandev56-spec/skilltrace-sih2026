@@ -31,6 +31,12 @@ export default function GovNav({ counts = { disputes: 0, followup: 0 }, onResetD
       badgeClass: 'nav-badge--warning',
     },
     {
+      path: '/audit',
+      labelEn: 'Audit Trail',
+      labelHi: 'अंकेक्षण अभिलेख',
+      badge: null,
+    },
+    {
       path: '/check-in',
       labelEn: 'Check-in Simulator',
       labelHi: 'चेक-इन सिम्युलेटर',

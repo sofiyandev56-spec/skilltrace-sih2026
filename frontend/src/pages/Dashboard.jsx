@@ -6,6 +6,7 @@ import { int, longDate, pct } from '../lib/format.js'
 import FilterBar from '../components/FilterBar.jsx'
 import StatCard from '../components/StatCard.jsx'
 import CompositionBar from '../components/CompositionBar.jsx'
+import Funnel from '../components/Funnel.jsx'
 import EvidenceFooter from '../components/EvidenceFooter.jsx'
 import ReviewInsights from '../components/ReviewInsights.jsx'
 import ProviderTable from '../components/ProviderTable.jsx'
@@ -114,6 +115,9 @@ export default function Dashboard() {
   const d = dash.data
   const loading = dash.loading && !d
 
+  const cohortLabel =
+    [filters.cohort, filters.course, filters.district].filter(Boolean).join(' · ') || 'All cohorts'
+
   return (
     <div className="stack">
       {externalChange && (
@@ -196,6 +200,9 @@ export default function Dashboard() {
               note="Evidence mix across every outcome record in this slice."
               delta={deltas?.total}
               changed={Boolean(deltas?.total)}
+              cohort={cohortLabel}
+              population={int(d.total_trainees)}
+              eventCount={d.event_count}
             />
             <StatCard
               label="Employed"
@@ -206,6 +213,9 @@ export default function Dashboard() {
               note="Only placements confirmed 3+ months later at the same employer are counted here."
               delta={deltas?.employed}
               changed={Boolean(deltas?.employed)}
+              cohort={cohortLabel}
+              population={int(d.total_trainees)}
+              eventCount={d.event_count}
             />
             <StatCard
               label="Self-employed"
@@ -216,6 +226,9 @@ export default function Dashboard() {
               note="Bank-verified income is treated as the strongest evidence of self-employment."
               delta={deltas?.self_employed}
               changed={Boolean(deltas?.self_employed)}
+              cohort={cohortLabel}
+              population={int(d.total_trainees)}
+              eventCount={d.event_count}
             />
             <StatCard
               label="Apprentice"
@@ -226,6 +239,9 @@ export default function Dashboard() {
               note="Apprenticeships are tracked separately from employment — a stipend is not a wage."
               delta={deltas?.apprentice}
               changed={Boolean(deltas?.apprentice)}
+              cohort={cohortLabel}
+              population={int(d.total_trainees)}
+              eventCount={d.event_count}
             />
             <StatCard
               label="No data"
@@ -236,6 +252,9 @@ export default function Dashboard() {
               note="We report this as unknown rather than assuming an outcome. These names feed the follow-up queue."
               delta={deltas?.no_data}
               changed={Boolean(deltas?.no_data)}
+              cohort={cohortLabel}
+              population={int(d.total_trainees)}
+              eventCount={d.event_count}
             />
           </div>
 
@@ -250,6 +269,21 @@ export default function Dashboard() {
             </div>
             <div className="panel__body">
               <CompositionBar outcomes={d.outcomes} total={d.total_trainees} />
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel__head">
+              <div>
+                <div className="panel__title">Where the cohort drops off</div>
+                <div className="panel__hint">
+                  Each stage as a share of everyone certified. The largest fall is where the
+                  programme is actually losing people.
+                </div>
+              </div>
+            </div>
+            <div className="panel__body">
+              <Funnel stages={d.funnel} />
             </div>
           </div>
 

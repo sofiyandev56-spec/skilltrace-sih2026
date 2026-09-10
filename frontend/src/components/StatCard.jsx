@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { EvidenceBreakdown, EvidenceMeter } from './Evidence.jsx'
+import EvidenceDrawer from './EvidenceDrawer.jsx'
 import { describeEvidence } from '../lib/evidence.js'
 import { useDismiss } from '../lib/useApi.js'
 
@@ -7,8 +9,8 @@ import { useDismiss } from '../lib/useApi.js'
  * A headline figure with its evidence attached.
  *
  * Nothing on this dashboard shows a number without showing how much of it can
- * be trusted: the stacked meter is always visible, and clicking the card opens
- * the exact tier breakdown.
+ * be trusted: the stacked meter is always visible, clicking the card opens the
+ * tier breakdown, and the breakdown opens the full drill-down drawer.
  */
 export default function StatCard({
   label,
@@ -20,9 +22,15 @@ export default function StatCard({
   tone,
   delta,
   changed,
+  definition,
+  cohort,
+  population,
+  eventCount,
 }) {
   const [open, setOpen] = useState(false)
+  const [drawer, setDrawer] = useState(false)
   const ref = useRef(null)
+  const navigate = useNavigate()
   useDismiss(ref, () => setOpen(false), open)
 
   const classes = [
@@ -65,8 +73,40 @@ export default function StatCard({
       {open && (
         <div className="pop">
           <EvidenceBreakdown evidence={evidence} note={note} />
+          {evidence?.total ? (
+            <button
+              type="button"
+              className="pop__more"
+              onClick={() => {
+                setOpen(false)
+                setDrawer(true)
+              }}
+            >
+              View evidence →
+            </button>
+          ) : null}
         </div>
       )}
+
+      <EvidenceDrawer
+        open={drawer}
+        onClose={() => setDrawer(false)}
+        title={label}
+        value={`${value}${unit || ''}`}
+        definition={definition || note}
+        cohort={cohort}
+        population={population}
+        evidence={evidence}
+        eventCount={eventCount}
+        onViewEvents={() => {
+          setDrawer(false)
+          navigate('/audit')
+        }}
+        onMethodology={() => {
+          setDrawer(false)
+          navigate('/consent')
+        }}
+      />
     </div>
   )
 }

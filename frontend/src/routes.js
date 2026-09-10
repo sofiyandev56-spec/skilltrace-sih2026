@@ -23,6 +23,12 @@ export const ROUTE_META = {
     desc: 'Trainees who did not respond after three contact attempts, for field officer assignment.',
     descHi: 'तीन बार संपर्क के बाद भी उत्तर न देने वाले प्रशिक्षार्थी, क्षेत्रीय अधिकारी को सौंपने हेतु।',
   },
+  '/audit': {
+    title: 'Audit Trail',
+    titleHi: 'अंकेक्षण अभिलेख',
+    desc: 'Every outcome is calculated from dated events. Records are never silently overwritten.',
+    descHi: 'प्रत्येक परिणाम दिनांकित घटनाओं से गणित है। अभिलेख कभी चुपचाप नहीं बदले जाते।',
+  },
   '/check-in': {
     title: 'Check-in Simulator',
     titleHi: 'चेक-इन सिम्युलेटर',
@@ -41,4 +47,21 @@ export const ROUTE_META = {
     desc: 'Your own record as the government holds it, and what you can do about it.',
     descHi: 'सरकार के पास आपका अपना अभिलेख, और उस पर आपके अधिकार।',
   },
+}
+
+/**
+ * Resolves a pathname to its metadata, including dynamic segments like
+ * `/providers/PRV-001` which have no literal key in ROUTE_META.
+ */
+export function routeMetaFor(pathname) {
+  if (ROUTE_META[pathname]) return ROUTE_META[pathname]
+  if (pathname.startsWith('/providers/')) {
+    return {
+      title: 'Training Centre',
+      titleHi: 'प्रशिक्षण केंद्र',
+      desc: 'Outcomes for a single centre, with the evidence behind each figure.',
+      descHi: 'एकल केंद्र के परिणाम, प्रत्येक आँकड़े के प्रमाण सहित।',
+    }
+  }
+  return { title: 'SkillTrace' }
 }

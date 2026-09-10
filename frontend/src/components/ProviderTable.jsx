@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { EvidenceBadge } from './Evidence.jsx'
 import { dominantTier } from '../lib/evidence.js'
 import { int } from '../lib/format.js'
@@ -81,7 +82,9 @@ export default function ProviderTable({ providers = [], onSelect, activeProvider
             >
               <td className="rank">{i + 1}</td>
               <td>
-                <div style={{ fontWeight: 600 }}>{p.name}</div>
+                <Link className="tbl__link" to={`/providers/${p.id}`}>
+                  {p.name}
+                </Link>
                 <div className="faint small mono">{p.id}</div>
               </td>
               <td>{p.district}</td>

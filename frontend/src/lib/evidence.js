@@ -7,34 +7,46 @@ export const TIERS = {
   high: {
     key: 'high',
     label: 'Verified',
-    color: '#1a7a4c',
+    color: '#16803C',
     className: 'tier--high',
     meaning: 'Confirmed by bank records or directly by the employer.',
+    source: 'Consent-based income signal, or an administrative record.',
   },
   medium: {
     key: 'medium',
     label: 'Corroborated',
-    color: '#2b6cb0',
+    color: '#1769AA',
     className: 'tier--medium',
     meaning: 'Checked in person by a field officer, or matched across two sources.',
+    source: 'Trainee check-in and employer confirmation agree.',
   },
   low: {
     key: 'low',
     label: 'Self-reported',
-    color: '#b4623a',
+    color: '#A65308',
     className: 'tier--low',
     meaning: 'Stated by the trainee and not yet independently confirmed.',
+    source: 'Trainee check-in only.',
   },
   stale: {
     key: 'stale',
     label: 'Stale',
-    color: '#8a949e',
+    color: '#667085',
     className: 'tier--stale',
     meaning: 'Last confirmed more than 9 months ago. Treat as out of date.',
+    source: 'No new reliable signal in the current tracking period.',
+  },
+  conflict: {
+    key: 'conflict',
+    label: 'Needs review',
+    color: '#B42318',
+    className: 'tier--conflict',
+    meaning: 'The employer and the trainee disagree. Neither claim is recorded as fact.',
+    source: 'Conflicting reports awaiting field officer review.',
   },
 }
 
-export const TIER_ORDER = ['high', 'medium', 'low', 'stale']
+export const TIER_ORDER = ['high', 'medium', 'low', 'stale', 'conflict']
 
 export const tierOf = (trustLevel) => TIERS[trustLevel] || TIERS.stale
 
@@ -58,12 +70,12 @@ export function dominantTier(evidence) {
 
 /** Colours for the outcome buckets shown on the dashboard. */
 export const BUCKET_META = {
-  employed: { label: 'Employed', color: '#1a7a4c' },
-  self_employed: { label: 'Self-employed', color: '#2b6cb0' },
+  employed: { label: 'Employed', color: '#16803C' },
+  self_employed: { label: 'Self-employed', color: '#1769AA' },
   apprentice: { label: 'Apprentice', color: '#6b46a8' },
-  not_working: { label: 'Not working', color: '#a32c2c' },
-  awaiting_confirmation: { label: 'Awaiting 3-month confirmation', color: '#b4623a' },
-  no_data: { label: 'No data', color: '#8a949e' },
+  not_working: { label: 'Not working', color: '#B42318' },
+  awaiting_confirmation: { label: 'Awaiting 3-month confirmation', color: '#A65308' },
+  no_data: { label: 'No data', color: '#667085' },
 }
 
 export const SOURCE_LABEL = {

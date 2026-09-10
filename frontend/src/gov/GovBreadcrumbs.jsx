@@ -1,12 +1,13 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useGov } from './GovContext.jsx'
-import { ROUTE_META } from '../routes.js'
+import { routeMetaFor } from '../routes.js'
 
 const ROUTE_SECTIONS = {
   '/': { sectionEn: 'Oversight', sectionHi: 'निगरानी' },
   '/disputes': { sectionEn: 'Oversight', sectionHi: 'निगरानी' },
   '/follow-up': { sectionEn: 'Oversight', sectionHi: 'निगरानी' },
+  '/audit': { sectionEn: 'Transparency', sectionHi: 'पारदर्शिता' },
   '/check-in': { sectionEn: 'Data Collection', sectionHi: 'डेटा संग्रह' },
   '/consent': { sectionEn: 'Trainee Rights', sectionHi: 'प्रशिक्षार्थी अधिकार' },
 }
@@ -14,8 +15,12 @@ const ROUTE_SECTIONS = {
 export default function GovBreadcrumbs() {
   const { pathname } = useLocation()
   const { lang, t } = useGov()
-  const meta = ROUTE_META[pathname] || { title: 'SkillTrace' }
-  const sec = ROUTE_SECTIONS[pathname] || { sectionEn: 'Portal', sectionHi: 'पोर्टल' }
+  const meta = routeMetaFor(pathname)
+  const sec =
+    ROUTE_SECTIONS[pathname] ||
+    (pathname.startsWith('/providers/')
+      ? { sectionEn: 'Oversight', sectionHi: 'निगरानी' }
+      : { sectionEn: 'Portal', sectionHi: 'पोर्टल' })
 
   return (
     <div className="gov-breadcrumb-bar">

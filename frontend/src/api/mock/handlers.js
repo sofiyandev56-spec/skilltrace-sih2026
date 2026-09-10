@@ -200,6 +200,31 @@ export function getDashboard(filters = {}) {
     return row
   })
 
+  /* --- the drop-off funnel, certification through to role-matched work --- */
+  let contacted = 0
+  let retained3 = 0
+  let roleMatched = 0
+  for (const t of cohort) {
+    const evs = data.eventsByTrainee[t.id] || []
+    // "Contacted" means the trainee themselves answered — a bank or employer
+    // signal is evidence about them, not contact with them.
+    if (evs.some((e) => e.source === 'trainee' || e.source === 'field_officer')) contacted += 1
+    const c = classify(evs)
+    if (c.bucket === 'employed') {
+      retained3 += 1
+      const def = COURSES.find((x) => x.name === t.course)
+      if (def && c.event?.job_role === def.intended_role) roleMatched += 1
+    }
+  }
+
+  const funnel = [
+    { stage: 'Certified', count: total, note: 'Completed training and assessed' },
+    { stage: 'Contacted', count: contacted, note: 'Responded to at least one check-in' },
+    { stage: 'Employed', count: everPlaced, note: 'Reported a placement' },
+    { stage: 'Retained 3 months', count: retained3, note: 'Same employer 3+ months on' },
+    { stage: 'Role-matched', count: roleMatched, note: 'Working in the trained occupation' },
+  ].map((s) => ({ ...s, pct: total ? Math.round((s.count / total) * 1000) / 10 : 0 }))
+
   return {
     as_of: AS_OF,
     filters_applied: filters,
@@ -208,10 +233,12 @@ export function getDashboard(filters = {}) {
     headline_placement_count: everPlaced,
     outcomes,
     retention,
+    funnel,
     wage_progression,
     wage_evidence: tierPercentages(wageTiers),
     cohorts_present: cohortsPresent,
     evidence_totals: tierPercentages(overallTiers),
+    event_count: data.events.length,
     consent: data.consentTotals,
   }
 }
@@ -589,4 +616,158 @@ export function getReviewInsights(filters = {}) {
 export function resetAll() {
   store.resetStore()
   return { ok: true }
+}
+
+/* ------------------------------------------------------------------ */
+/* GET /audit — the append-only event ledger                           */
+/* ------------------------------------------------------------------ */
+
+const EVENT_LABEL = {
+  placed: 'Placement reported',
+  still_working: 'Still working confirmed',
+  left_job: 'Left the job',
+  self_employed: 'Self-employment reported',
+  apprentice: 'Apprenticeship reported',
+  not_working: 'Not working reported',
+}
+
+const SOURCE_LABEL = {
+  bank: 'Consent-based income signal',
+  employer: 'Employer confirmation',
+  trainee: 'Trainee check-in',
+  field_officer: 'Field officer visit',
+}
+
+/**
+ * Every outcome on this platform is derived from dated events, and events are
+ * never rewritten. This returns them newest-first so an officer can trace a
+ * headline figure back to the individual records that produced it.
+ */
+export function getAuditLog(filters = {}) {
+  const data = store.currentData()
+  const cohort = applyFilters(data.trainees, filters)
+  const ids = new Set(cohort.map((t) => t.id))
+  const byId = Object.fromEntries(cohort.map((t) => [t.id, t]))
+  const withdrawn = new Set(
+    data.consents.filter((c) => c.status === 'withdrawn').map((c) => c.trainee_id),
+  )
+
+  const rows = data.events
+    .filter((e) => ids.has(e.trainee_id))
+    .map((e) => ({
+      id: e.id,
+      date: e.date,
+      trainee_id: e.trainee_id,
+      trainee_name: byId[e.trainee_id]?.name ?? null,
+      event_type: EVENT_LABEL[e.what_happened] || e.what_happened,
+      what_happened: e.what_happened,
+      source: SOURCE_LABEL[e.source] || e.source,
+      source_key: e.source,
+      trust_level: e.trust_level,
+      employer: e.employer ?? null,
+      job_role: e.job_role ?? null,
+      salary: e.salary ?? null,
+      consent_status: withdrawn.has(e.trainee_id) ? 'withdrawn' : 'active',
+      // A placement alone never moves the employment figure — only a
+      // still_working event 3+ months on does.
+      outcome_impact:
+        e.what_happened === 'still_working'
+          ? 'Counted towards verified employment'
+          : e.what_happened === 'placed'
+            ? 'Recorded, awaiting 3-month confirmation'
+            : 'Recorded against the trainee timeline',
+    }))
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+
+  const limit = filters.limit || 150
+  return {
+    total: rows.length,
+    showing: Math.min(limit, rows.length),
+    events: rows.slice(0, limit),
+    as_of: AS_OF,
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* GET /providers/:id — single training centre, in depth               */
+/* ------------------------------------------------------------------ */
+
+export function getProvider(id, filters = {}) {
+  const data = store.currentData()
+  const raw = store.rawData()
+  const provider = raw.providers.find((p) => p.id === id)
+  if (!provider) return null
+
+  const cohort = applyFilters(data.trainees, filters).filter((t) => t.provider_id === id)
+  const total = cohort.length
+
+  const tiers = emptyTiers()
+  let employed = 0
+  let placedEver = 0
+  let roleMatched = 0
+  let stale = 0
+
+  const byCourse = {}
+
+  for (const t of cohort) {
+    const evs = data.eventsByTrainee[t.id] || []
+    const c = classify(evs)
+    const def = COURSES.find((x) => x.name === t.course)
+    const slot = (byCourse[t.course] ||= {
+      course: t.course,
+      intended_role: def?.intended_role ?? null,
+      certified: 0,
+      employed: 0,
+      role_matched: 0,
+      tiers: emptyTiers(),
+    })
+    slot.certified += 1
+
+    if (evs.some((e) => e.what_happened === 'placed')) placedEver += 1
+    if (c.bucket === 'employed') {
+      employed += 1
+      tiers[c.trust] += 1
+      slot.employed += 1
+      slot.tiers[c.trust] += 1
+      if (def && c.event?.job_role === def.intended_role) {
+        roleMatched += 1
+        slot.role_matched += 1
+      }
+    }
+    if (c.trust === 'stale') stale += 1
+  }
+
+  const pct = (n) => (total ? Math.round((n / total) * 1000) / 10 : 0)
+
+  // A centre's confidence score is how much of its own reported success is
+  // backed by evidence it did not produce itself.
+  const evidence = tierPercentages(tiers)
+  const confidence = Math.round(
+    (evidence.high || 0) * 1.0 + (evidence.medium || 0) * 0.6 + (evidence.low || 0) * 0.2,
+  )
+
+  return {
+    id: provider.id,
+    name: provider.name,
+    district: provider.district,
+    status: 'Active',
+    courses: [...new Set(cohort.map((t) => t.course))].sort(),
+    certified_count: total,
+    employment_pct: pct(employed),
+    headline_placement_pct: pct(placedEver),
+    verified_pct: evidence.high || 0,
+    role_matched_pct: pct(roleMatched),
+    stale_pct: pct(stale),
+    confidence_score: Math.min(100, confidence),
+    evidence,
+    by_course: Object.values(byCourse)
+      .map((s) => ({
+        ...s,
+        employment_pct: s.certified ? Math.round((s.employed / s.certified) * 1000) / 10 : 0,
+        role_match_pct: s.certified ? Math.round((s.role_matched / s.certified) * 1000) / 10 : 0,
+        evidence: tierPercentages(s.tiers),
+      }))
+      .sort((a, b) => b.certified - a.certified),
+    as_of: AS_OF,
+  }
 }

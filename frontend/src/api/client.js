@@ -103,7 +103,12 @@ export const api = {
 
   getProviders: (f = {}) => request(`/providers${qs(f)}`, {}, () => mock.getProviders(f)),
 
+  getProvider: (id, f = {}) =>
+    request(`/providers/${id}${qs(f)}`, {}, () => mock.getProvider(id, f)),
+
   getSkillGap: (f = {}) => request(`/skill-gap${qs(f)}`, {}, () => mock.getSkillGap(f)),
+
+  getAuditLog: (f = {}) => request(`/audit${qs(f)}`, {}, () => mock.getAuditLog(f)),
 
   /* disputes */
   getDisputes: () => request('/disputes', {}, () => mock.getDisputes()),

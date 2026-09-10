@@ -12,21 +12,23 @@ import GovPolicyModal from './gov/GovPolicyModal.jsx'
 import AuthModal from './auth/AuthModal.jsx'
 import { ToastProvider } from './components/Toast.jsx'
 import ProtectedRoute from './auth/ProtectedRoute.jsx'
-import { ROUTE_META } from './routes.js'
+import { routeMetaFor } from './routes.js'
 import Dashboard from './pages/Dashboard.jsx'
 import Disputes from './pages/Disputes.jsx'
 import Consent from './pages/Consent.jsx'
 import CheckIn from './pages/CheckIn.jsx'
 import FollowupQueue from './pages/FollowupQueue.jsx'
 import ClientDashboard from './pages/ClientDashboard.jsx'
+import ProviderDetail from './pages/ProviderDetail.jsx'
+import AuditTrail from './pages/AuditTrail.jsx'
 
 /** Keeps the browser tab title in step with the page and the language. */
 function useDocumentTitle() {
   const { pathname } = useLocation()
   const { lang } = useGov()
   useEffect(() => {
-    const meta = ROUTE_META[pathname]
-    const title = meta ? (lang === 'hi' && meta.titleHi ? meta.titleHi : meta.title) : 'SkillTrace'
+    const meta = routeMetaFor(pathname)
+    const title = lang === 'hi' && meta.titleHi ? meta.titleHi : meta.title
     document.title = `${title} — SkillTrace`
   }, [pathname, lang])
 }
@@ -109,6 +111,22 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['government']}>
                 <FollowupQueue />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/providers/:id"
+            element={
+              <ProtectedRoute allowedRoles={['government']}>
+                <ProviderDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audit"
+            element={
+              <ProtectedRoute allowedRoles={['government']}>
+                <AuditTrail />
               </ProtectedRoute>
             }
           />
