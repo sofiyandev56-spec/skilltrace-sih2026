@@ -73,16 +73,16 @@ export default function App() {
           {t('skipToMain')}
         </a>
 
-        <div className="gov-tricolor" aria-hidden="true">
+      <GovTopbar />
+      <GovNav counts={counts} onResetDemo={resetDemo} />
+
+      <div className="gov-tricolor" aria-hidden="true">
         <span className="gov-tricolor__saffron" />
         <span className="gov-tricolor__white" />
         <span className="gov-tricolor__green" />
       </div>
 
       <GovIdentity />
-      <GovTopbar />
-
-      <GovNav counts={counts} onResetDemo={resetDemo} />
       <GovBreadcrumbs />
 
       <main className="gov-main-content" id="main-content" tabIndex={-1}>
