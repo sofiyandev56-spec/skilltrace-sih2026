@@ -1,71 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="100%" height="100%" aria-label="State Emblem of India">
-  <!-- Stylized State Emblem of India (Lion Capital of Ashoka) -->
-  <g fill="#1a2a6c" stroke="#1a2a6c" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Top Lions Crest -->
-    <!-- Center Lion Face -->
-    <path d="M100 28 C92 28 88 34 88 42 C88 52 92 58 100 58 C108 58 112 52 112 42 C112 34 108 28 100 28 Z" fill="#1a2a6c"/>
-    <path d="M96 38 C96 36 98 34 100 34 C102 34 104 36 104 38 C104 40 102 42 100 42 C98 42 96 40 96 38 Z" fill="#ffffff"/>
-    <circle cx="98" cy="38" r="1" fill="#1a2a6c"/>
-    <circle cx="102" cy="38" r="1" fill="#1a2a6c"/>
-    <!-- Center Lion Mane & Crown -->
-    <path d="M100 18 C94 18 90 22 88 26 C82 24 76 28 76 36 C76 44 80 50 84 54 C84 62 88 70 94 76 L100 82 L106 76 C112 70 116 62 116 54 C120 50 124 44 124 36 C124 28 118 24 112 26 C110 22 106 18 100 18 Z" fill="none" stroke="#1a2a6c" stroke-width="2.5"/>
-    <path d="M92 46 C94 50 100 52 100 52 C100 52 106 50 108 46" fill="none" stroke="#1a2a6c" stroke-width="2"/>
-    <!-- Whiskers & Chin -->
-    <path d="M100 52 L100 56 M96 54 L92 56 M104 54 L108 56" stroke="#1a2a6c" stroke-width="1.5"/>
-
-    <!-- Left Lion (Profile) -->
-    <path d="M78 36 C72 34 66 38 64 44 C62 50 64 56 68 60 C64 64 62 70 64 76 C66 82 72 86 78 88 L84 82 C82 76 80 70 82 64" fill="none" stroke="#1a2a6c" stroke-width="2.2"/>
-    <path d="M68 46 C66 45 64 47 64 49 C64 51 66 52 68 52 Z" fill="#1a2a6c"/>
-    <circle cx="66" cy="48" r="0.8" fill="#ffffff"/>
-
-    <!-- Right Lion (Profile) -->
-    <path d="M122 36 C128 34 134 38 136 44 C138 50 136 56 132 60 C136 64 138 70 136 76 C134 82 128 86 122 88 L116 82 C118 76 120 70 118 64" fill="none" stroke="#1a2a6c" stroke-width="2.2"/>
-    <path d="M132 46 C134 45 136 47 136 49 C136 51 134 52 132 52 Z" fill="#1a2a6c"/>
-    <circle cx="134" cy="48" r="0.8" fill="#ffffff"/>
-
-    <!-- Lion Bodies & Paws (Abacus Support) -->
-    <path d="M84 82 L84 108 L116 108 L116 82" fill="none" stroke="#1a2a6c" stroke-width="2.5"/>
-    <path d="M88 84 C88 94 92 102 94 108 M112 84 C112 94 108 102 106 108" stroke="#1a2a6c" stroke-width="1.8"/>
-    <path d="M100 82 L100 108" stroke="#1a2a6c" stroke-width="2"/>
-    <!-- Left and right paws -->
-    <path d="M72 86 L76 108 L84 108 M128 86 L124 108 L116 108" stroke="#1a2a6c" stroke-width="2" fill="none"/>
-
-    <!-- Abacus Upper Border -->
-    <rect x="52" y="108" width="96" height="5" rx="1.5" fill="#1a2a6c"/>
-
-    <!-- Center Ashoka Chakra on Abacus -->
-    <circle cx="100" cy="125" r="11" fill="none" stroke="#1a2a6c" stroke-width="2"/>
-    <circle cx="100" cy="125" r="2.5" fill="#1a2a6c"/>
-    <!-- 24 Spokes (simplified 12 radial lines) -->
-    <line x1="100" y1="114" x2="100" y2="136" stroke="#1a2a6c" stroke-width="1"/>
-    <line x1="89" y1="125" x2="111" y2="125" stroke="#1a2a6c" stroke-width="1"/>
-    <line x1="92.2" y1="117.2" x2="107.8" y2="132.8" stroke="#1a2a6c" stroke-width="1"/>
-    <line x1="92.2" y1="132.8" x2="107.8" y2="117.2" stroke="#1a2a6c" stroke-width="1"/>
-    <line x1="95" y1="114.5" x2="105" y2="135.5" stroke="#1a2a6c" stroke-width="0.8"/>
-    <line x1="95" y1="135.5" x2="105" y2="114.5" stroke="#1a2a6c" stroke-width="0.8"/>
-    <line x1="89.5" y1="120" x2="110.5" y2="130" stroke="#1a2a6c" stroke-width="0.8"/>
-    <line x1="89.5" y1="130" x2="110.5" y2="120" stroke="#1a2a6c" stroke-width="0.8"/>
-
-    <!-- Left Animal on Abacus: Galloping Horse -->
-    <path d="M68 126 C66 122 62 120 58 122 C56 124 58 128 62 129 C65 130 68 132 68 134 M58 129 L55 135 M64 130 L66 135" fill="none" stroke="#1a2a6c" stroke-width="1.6"/>
-    <!-- Right Animal on Abacus: Bull -->
-    <path d="M132 126 C134 122 138 120 142 122 C144 124 142 128 138 129 C135 130 132 132 132 134 M142 129 L145 135 M136 130 L134 135" fill="none" stroke="#1a2a6c" stroke-width="1.6"/>
-
-    <!-- Abacus Lower Base -->
-    <rect x="50" y="137" width="100" height="5" rx="1.5" fill="#1a2a6c"/>
-
-    <!-- Inverted Lotus Base (Bell-shaped Lotus) -->
-    <path d="M58 142 C64 146 72 152 100 152 C128 152 136 146 142 142 L138 158 C124 162 112 163 100 163 C88 163 76 162 62 158 Z" fill="#1a2a6c" opacity="0.9"/>
-    <!-- Lotus Petal Carvings -->
-    <path d="M72 144 C76 150 82 156 86 160 M92 144 C94 150 96 156 98 162 M108 144 C106 150 104 156 102 162 M128 144 C124 150 118 156 114 160" stroke="#ffffff" stroke-width="1.3" fill="none"/>
-    <rect x="58" y="163" width="84" height="4" rx="1" fill="#1a2a6c"/>
-  </g>
-
-  <!-- Motto: "सत्यमेव जयते" (Satyameva Jayate) in Devanagari -->
-  <text x="100" y="188" font-family="'Noto Sans Devanagari', 'Mangal', 'Devanagari MT', sans-serif" font-size="16.5" font-weight="700" fill="#1a2a6c" text-anchor="middle" letter-spacing="1.5">
-    सत्यमेव जयते
-  </text>
-  <text x="100" y="205" font-family="'Inter', -apple-system, sans-serif" font-size="8.5" font-weight="600" fill="#55636f" text-anchor="middle" letter-spacing="1.2">
-    GOVERNMENT OF INDIA
-  </text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SkillTrace portal mark">
+  <title>SkillTrace portal mark</title>
+  <!--
+    Neutral placeholder. The State Emblem of India is deliberately NOT used:
+    its display is restricted by the State Emblem of India (Prohibition of
+    Improper Use) Act, 2005, and this prototype holds no authorisation.
+    On an authorised deployment the departmental emblem would sit here.
+  -->
+  <rect width="64" height="64" fill="#14202e"/>
+  <rect x="8" y="8" width="48" height="48" fill="none" stroke="#b4623a" stroke-width="1.5"/>
+  <path d="M20 42V22h5l7 12 7-12h5v20h-5V31l-5 9h-4l-5-9v11z" fill="#ffffff"/>
+  <rect x="20" y="46" width="24" height="2" fill="#b4623a"/>
 </svg>

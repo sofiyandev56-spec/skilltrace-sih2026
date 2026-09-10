@@ -1,66 +1,57 @@
-import { Link } from 'react-router-dom'
-import { useA11y } from './AccessibilityProvider.jsx'
+import { useGov } from './GovContext.jsx'
 
 /**
- * GIGW 3.0 requires a defined set of links to be reachable from every page:
- * the website policies, an accessibility statement, help, feedback, a sitemap
- * and RTI. It also requires the page to say who owns the content and when it
- * was last updated.
+ * GIGW 3.0 requires a defined set of disclosures to be reachable from every
+ * page: the website policies, an accessibility statement, RTI, and a clear
+ * statement of who owns the content and when it was last updated.
  */
 const POLICY_LINKS = [
-  ['footerPolicies', '/policies'],
-  ['footerTerms', '/policies#terms'],
-  ['footerPrivacy', '/policies#privacy'],
-  ['footerCopyright', '/policies#copyright'],
-  ['footerHyperlinking', '/policies#hyperlinking'],
-  ['footerAccessibility', '/policies#accessibility'],
-  ['footerDisclaimer', '/policies#disclaimer'],
-  ['footerRti', '/policies#rti'],
-  ['footerHelp', '/policies#help'],
-  ['footerFeedback', '/policies#feedback'],
-  ['footerSitemap', '/policies#sitemap'],
+  ['privacy', 'Privacy Policy & DPDPA 2023', 'गोपनीयता नीति एवं डीपीडीपीए'],
+  ['terms', 'Terms & Conditions', 'नियम एवं शर्तें'],
+  ['copyright', 'Copyright Policy', 'कॉपीराइट नीति'],
+  ['hyperlink', 'Hyperlinking Policy', 'हाइपरलिंकिंग नीति'],
+  ['accessibility', 'Accessibility Statement', 'सुगम्यता विवरण'],
+  ['rti', 'Right to Information', 'सूचना का अधिकार'],
+  ['disclaimer', 'Disclaimer', 'अस्वीकरण'],
 ]
 
-/** A real count of visits from this browser — not an invented number. */
-function visitCount() {
-  try {
-    const n = Number(localStorage.getItem('skilltrace.visits') || 0) + 1
-    localStorage.setItem('skilltrace.visits', String(n))
-    return n
-  } catch {
-    return 1
-  }
-}
-
-const VISITS = visitCount()
-
 export default function GovFooter() {
-  const { t } = useA11y()
+  const { lang, openPolicy, t } = useGov()
+  const hi = lang === 'hi'
 
   return (
-    <footer className="gov-foot" role="contentinfo">
-      <div className="gov-foot__links">
-        <ul>
-          {POLICY_LINKS.map(([key, to]) => (
-            <li key={key}>
-              <Link to={to}>{t(key)}</Link>
-            </li>
-          ))}
-        </ul>
-      </div>
+    <footer className="gov-footer" role="contentinfo">
+      <div className="gov-footer__top">
+        <div className="gov-footer__inner">
+          <ul className="gov-footer__nav">
+            {POLICY_LINKS.map(([id, en, hiLabel]) => (
+              <li key={id}>
+                <button type="button" className="gov-footer__link" onClick={() => openPolicy(id)}>
+                  {hi ? hiLabel : en}
+                </button>
+              </li>
+            ))}
+          </ul>
 
-      <div className="gov-foot__meta">
-        <p>{t('contentOwned')}</p>
-        <p>{t('accessibilityCompliance')}</p>
-        <p className="gov-foot__proto">{t('developedBy')}</p>
-        <p className="gov-foot__stamp">
-          <span>
-            {t('lastUpdated')}: <span className="num">10 Sep 2026</span>
-          </span>
-          <span>
-            {t('visitors')}: <span className="num">{VISITS.toLocaleString('en-IN')}</span>
-          </span>
-        </p>
+          <div className="gov-footer__info-grid">
+            <div className="gov-footer__ownership">
+              <span className="gov-footer__statement">{t('contentOwned')}</span>
+              <span className="gov-footer__sub">{t('accessibilityCompliance')}</span>
+              <span className="gov-footer__compliance">{t('prototypeNotice')}</span>
+            </div>
+
+            <div className="gov-footer__meta">
+              <div className="gov-footer__meta-item">
+                <span className="gov-footer__meta-label">{t('lastUpdated')}</span>
+                <strong className="num">10 Sep 2026</strong>
+              </div>
+              <div className="gov-footer__meta-item">
+                <span className="gov-footer__meta-label">{hi ? 'संस्करण' : 'Version'}</span>
+                <strong className="num">0.1 (prototype)</strong>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </footer>
   )

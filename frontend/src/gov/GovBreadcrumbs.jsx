@@ -37,7 +37,7 @@ export default function GovBreadcrumbs() {
             <li className="gov-breadcrumb__sep" aria-hidden="true">&rsaquo;</li>
             <li aria-current="page">
               <span className="gov-breadcrumb__current">
-                {meta.title}
+                {lang === 'hi' && meta.titleHi ? meta.titleHi : meta.title}
               </span>
             </li>
           </ol>
@@ -45,7 +45,7 @@ export default function GovBreadcrumbs() {
 
         {meta.desc && (
           <div className="gov-page-desc">
-            {meta.desc}
+            {lang === 'hi' && meta.descHi ? meta.descHi : meta.desc}
           </div>
         )}
       </div>
