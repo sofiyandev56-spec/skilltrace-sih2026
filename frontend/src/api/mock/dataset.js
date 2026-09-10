@@ -15,24 +15,15 @@
  *                       by the employer confirmation page and by check-in copy.
  */
 
-export const AS_OF = '2026-09-10'
+import { REVIEW_QUESTIONS } from '../../lib/review.js'
+import { organizedData } from './data/organized_data.js'
 
-export const DISTRICTS = [
-  'Pune', 'Nashik', 'Nagpur', 'Chhatrapati Sambhajinagar', 'Solapur',
-  'Kolhapur', 'Amravati', 'Latur', 'Jalgaon', 'Thane',
-]
+export const AS_OF = organizedData.as_of ?? '2026-09-10'
+
+export const DISTRICTS = organizedData.districts
 
 /** Each course trains for one intended job role, with a planned placement target. */
-export const COURSES = [
-  { name: 'Electrician (Level 3)', intended_role: 'Electrician', target_pct: 80 },
-  { name: 'Sewing Machine Operator', intended_role: 'Machine Operator', target_pct: 75 },
-  { name: 'Solar PV Installer', intended_role: 'Solar Technician', target_pct: 70 },
-  { name: 'Retail Sales Associate', intended_role: 'Sales Associate', target_pct: 78 },
-  { name: 'Data Entry Operator', intended_role: 'Data Entry Operator', target_pct: 72 },
-  { name: 'Welder (Gas & Arc)', intended_role: 'Welder', target_pct: 82 },
-  { name: 'CNC Machine Operator', intended_role: 'CNC Operator', target_pct: 76 },
-  { name: 'General Duty Assistant', intended_role: 'Healthcare Assistant', target_pct: 74 },
-]
+export const COURSES = organizedData.courses
 
 /** Roles trainees actually drift into when the placement misses its intended role. */
 const DRIFT_ROLES = [
@@ -61,6 +52,20 @@ const EMPLOYERS = [
   'Metro Retail Mart', 'Datawing Services', 'Shakti Fabrication Works',
   'Precision Tools India', 'Aarogya Healthcare Group', 'Sahyadri Logistics',
   'Nirmal Engineering Co.', 'Vertex Industrial Supplies', 'Sanjeevani Hospital',
+]
+
+/**
+ * Field officers available for assignment to a disputed record. A dispute that
+ * cannot be settled from the paper trail is escalated to one of these officers
+ * for an in-person visit — the "assisted follow-up" the programme guarantees.
+ */
+export const FIELD_OFFICERS = [
+  { id: 'FO-101', name: 'Rajesh Patel', designation: 'Senior Field Officer', division: 'Pune', open_cases: 3 },
+  { id: 'FO-102', name: 'Sunita Kulkarni', designation: 'Field Officer', division: 'Nashik', open_cases: 1 },
+  { id: 'FO-103', name: 'Arun Jadhav', designation: 'Field Officer', division: 'Nagpur', open_cases: 4 },
+  { id: 'FO-104', name: 'Meena Pawar', designation: 'Senior Field Officer', division: 'Latur', open_cases: 2 },
+  { id: 'FO-105', name: 'Vikram Deshmukh', designation: 'District Verification Officer', division: 'Thane', open_cases: 0 },
+  { id: 'FO-106', name: 'Asha Salunkhe', designation: 'Field Officer', division: 'Kolhapur', open_cases: 2 },
 ]
 
 const FIRST_NAMES = [
@@ -403,38 +408,47 @@ function buildDisputes(rng, trainees, events, seq) {
 
   const CLAIM_PAIRS = [
     {
+      type: 'Separation Dispute',
       employer_claim: 'Left employment on 12 Mar 2026 — did not complete notice period.',
       trainee_claim: 'Still working at the same unit; salary credited in March and April.',
     },
     {
+      type: 'Employment Denial',
       employer_claim: 'Never joined after offer letter was issued.',
       trainee_claim: 'Joined on 04 Jan 2026, worked 5 weeks, paid in cash without payslip.',
     },
     {
+      type: 'Role & Wage Mismatch',
       employer_claim: 'Employed as Helper, monthly wage ₹8,500.',
       trainee_claim: 'Working as Electrician, monthly wage ₹14,000.',
     },
     {
+      type: 'Contract Tenure Dispute',
       employer_claim: 'Contract ended at 2 months; not renewed.',
       trainee_claim: 'Contract renewed verbally; continued for 7 months.',
     },
     {
+      type: 'Attendance Dispute',
       employer_claim: 'Absent without notice since 20 Feb 2026.',
       trainee_claim: 'On approved medical leave; rejoined 05 Mar 2026.',
     },
     {
+      type: 'Working Hours Dispute',
       employer_claim: 'Working part-time, 4 days a week.',
       trainee_claim: 'Full-time, 6 days a week including Saturdays.',
     },
     {
+      type: 'Separation Cause Dispute',
       employer_claim: 'Trainee resigned voluntarily in Dec 2025.',
       trainee_claim: 'Was told not to return after the unit reduced its workforce.',
     },
     {
+      type: 'Wage Payment Dispute',
       employer_claim: 'Wage band ₹10,000–₹15,000, paid by bank transfer.',
       trainee_claim: 'Paid ₹9,000 in cash; no bank transfer received.',
     },
     {
+      type: 'Classification Dispute',
       employer_claim: 'Apprentice, stipend only — not a placement.',
       trainee_claim: 'Full employee doing the same work as permanent staff.',
     },
@@ -447,6 +461,9 @@ function buildDisputes(rng, trainees, events, seq) {
     const pair = CLAIM_PAIRS[i % CLAIM_PAIRS.length]
     disputes.push({
       id: `DSP-${String(seq.n++).padStart(4, '0')}`,
+      // Citizen-facing reference, quoted in correspondence about the case.
+      record_id: `ST-2026-${String(i + 1).padStart(3, '0')}`,
+      type: pair.type,
       trainee_id: t.id,
       trainee_name: t.name,
       course: t.course,
@@ -456,6 +473,8 @@ function buildDisputes(rng, trainees, events, seq) {
       trainee_claim: pair.trainee_claim,
       date: addDays(AS_OF, -(4 + Math.floor(rng() * 70))),
       status: 'open',
+      assigned_officer_id: null,
+      assigned_at: null,
     })
   }
   return disputes.sort((a, b) => (a.date < b.date ? 1 : -1))
@@ -469,7 +488,7 @@ function buildConsents(rng, trainees) {
     granted_date: addDays(cohortEndDate(t.cohort), -(2 + Math.floor(rng() * 12))),
     withdrawn_date: null,
     scopes: [
-      'Employment status check-ins by SMS or WhatsApp',
+      'Employment status check-ins by SMS or voice call',
       'Confirmation of employment with the named employer',
       'Salary band (not exact salary) from bank-verified records',
       'Use of anonymised outcomes in government skilling reports',
@@ -495,9 +514,46 @@ function buildFollowupQueue(rng, trainees, events) {
     cohort: t.cohort,
     attempts: 3 + Math.floor(rng() * 3),
     last_contact_date: addDays(AS_OF, -(30 + Math.floor(rng() * 200))),
-    channel: pick(rng, ['SMS', 'WhatsApp', 'Voice call']),
+    channel: pick(rng, ['SMS', 'Voice call', 'Field visit']),
     assigned_to: null,
   }))
+}
+
+/**
+ * Seeded post-training reviews. Roughly three in five trainees respond, and
+ * how well they rate a course tracks the quality of the centre that ran it —
+ * so the government's aggregate view actually separates good centres from
+ * weak ones instead of being uniform noise.
+ */
+function buildReviews(rng, trainees, providers) {
+  const reviews = []
+  for (const t of trainees) {
+    if (rng() > 0.58) continue // not everyone answers, and that is fine
+    const provider = providers.find((p) => p.id === t.provider_id)
+    const q = provider?._quality ?? 0.7
+
+    const answers = {}
+    for (const question of REVIEW_QUESTIONS) {
+      // Bias the draw towards the better options at better centres, while
+      // leaving every option reachable anywhere.
+      const roll = rng() * 0.55 + q * 0.45 + (rng() - 0.5) * 0.3
+      const idx = roll > 0.86 ? 0 : roll > 0.62 ? 1 : roll > 0.38 ? 2 : 3
+      answers[question.id] = question.options[idx].value
+    }
+
+    reviews.push({
+      id: `REV-${t.id.slice(4)}`,
+      trainee_id: t.id,
+      provider_id: t.provider_id,
+      course: t.course,
+      cohort: t.cohort,
+      district: t.district,
+      answers,
+      comment: null,
+      submitted_at: addDays(cohortEndDate(t.cohort), 5 + Math.floor(rng() * 40)),
+    })
+  }
+  return reviews.filter((r) => daysBetween(r.submitted_at, AS_OF) >= 0)
 }
 
 export function groupEventsByTrainee(events) {
@@ -513,21 +569,31 @@ export function groupEventsByTrainee(events) {
 
 export function buildDataset() {
   const rng = mulberry32(20260910)
-  const seq = { n: 1 }
 
-  const providers = buildProviders(rng)
-  const trainees = buildTrainees(rng, providers)
+  const trainees = organizedData.trainees
+  const events = organizedData.events
+  const disputes = organizedData.disputes.map((d, i) => ({
+    ...d,
+    record_id: d.record_id ?? `ST-2026-${String(i + 1).padStart(3, '0')}`,
+    assigned_officer_id: d.assigned_officer_id ?? null,
+    assigned_at: d.assigned_at ?? null,
+  }))
+  const consents = organizedData.consents
+  const followupQueue = organizedData.followupQueue
 
-  const events = []
-  for (const t of trainees) {
-    const p = providers.find((x) => x.id === t.provider_id)
-    events.push(...buildEventsFor(t, p, rng, seq))
+  // Reconstruct rich provider stats from the pre-built data
+  const rawProviders = organizedData.providers
+  const providerStats = buildProviderStats(rawProviders, trainees, events)
+
+  const reviews = buildReviews(rng, trainees, rawProviders)
+
+  return {
+    providers: providerStats,
+    trainees,
+    events,
+    disputes,
+    consents,
+    followupQueue,
+    reviews,
   }
-
-  const providerStats = buildProviderStats(providers, trainees, events)
-  const disputes = buildDisputes(rng, trainees, events, seq)
-  const consents = buildConsents(rng, trainees)
-  const followupQueue = buildFollowupQueue(rng, trainees, events)
-
-  return { providers: providerStats, trainees, events, disputes, consents, followupQueue }
 }

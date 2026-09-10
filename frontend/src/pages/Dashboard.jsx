@@ -6,6 +6,8 @@ import { int, longDate, pct } from '../lib/format.js'
 import FilterBar from '../components/FilterBar.jsx'
 import StatCard from '../components/StatCard.jsx'
 import CompositionBar from '../components/CompositionBar.jsx'
+import EvidenceFooter from '../components/EvidenceFooter.jsx'
+import ReviewInsights from '../components/ReviewInsights.jsx'
 import ProviderTable from '../components/ProviderTable.jsx'
 import DistrictGrid from '../components/DistrictGrid.jsx'
 import RetentionChart from '../components/charts/RetentionChart.jsx'
@@ -50,6 +52,7 @@ export default function Dashboard() {
   const dash = useApi(() => api.getDashboard(filters), [filtersKey, nonce])
   const provs = useApi(() => api.getProviders(filters), [filtersKey, nonce])
   const gap = useApi(() => api.getSkillGap(filters), [filtersKey, nonce])
+  const feedback = useApi(() => api.getReviewInsights(filters), [filtersKey, nonce])
 
   const refresh = useCallback(() => {
     setExternalChange(null)
@@ -273,6 +276,7 @@ export default function Dashboard() {
               </div>
               <div className="panel__body">
                 <WageChart rows={d.wage_progression} cohorts={d.cohorts_present} />
+                <EvidenceFooter evidence={d.wage_evidence} what="Wage figures" />
               </div>
             </div>
           </div>
@@ -340,9 +344,27 @@ export default function Dashboard() {
                 {gap.loading && !gap.data ? (
                   <div className="skeleton" style={{ height: 260 }} />
                 ) : (
-                  <SkillGapChart courses={gap.data?.courses || []} />
+                  <>
+                    <SkillGapChart courses={gap.data?.courses || []} />
+                    <EvidenceFooter evidence={gap.data?.evidence} what="Observed job roles" />
+                  </>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* ---- what trainees said about the training itself ---- */}
+          <div className="panel">
+            <div className="panel__head">
+              <div>
+                <div className="panel__title">Training feedback</div>
+                <div className="panel__hint">
+                  What trainees said about the course after finishing it, pooled across this slice.
+                </div>
+              </div>
+            </div>
+            <div className="panel__body">
+              <ReviewInsights data={feedback.data} loading={feedback.loading} />
             </div>
           </div>
         </>

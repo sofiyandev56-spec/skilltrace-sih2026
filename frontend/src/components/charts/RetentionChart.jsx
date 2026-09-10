@@ -4,6 +4,7 @@ import {
 import { EvidenceBadge } from '../Evidence.jsx'
 import { dominantTier } from '../../lib/evidence.js'
 import { pct } from '../../lib/format.js'
+import { BRAND } from '../../lib/chartTheme.js'
 
 /** % of placed trainees still at the same employer at each checkpoint. */
 export default function RetentionChart({ retention = [] }) {
@@ -13,8 +14,8 @@ export default function RetentionChart({ retention = [] }) {
     <div>
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: -12, bottom: 4 }}>
-          <CartesianGrid stroke="#eef1f4" vertical={false} />
-          <XAxis dataKey="name" tickLine={false} axisLine={{ stroke: '#dfe4e9' }} />
+          <CartesianGrid stroke={BRAND.grid} vertical={false} />
+          <XAxis dataKey="name" tickLine={false} axisLine={{ stroke: BRAND.border }} />
           <YAxis
             domain={[0, 100]}
             tickFormatter={(v) => `${v}%`}
@@ -22,7 +23,7 @@ export default function RetentionChart({ retention = [] }) {
             axisLine={false}
             width={46}
           />
-          <ReferenceLine y={50} stroke="#dfe4e9" strokeDasharray="3 3" />
+          <ReferenceLine y={50} stroke={BRAND.border} strokeDasharray="3 3" />
           <Tooltip
             formatter={(v, _n, p) => [
               `${pct(v)} — ${p.payload.retained} of ${p.payload.eligible} placements`,
@@ -32,9 +33,9 @@ export default function RetentionChart({ retention = [] }) {
           <Line
             type="monotone"
             dataKey="pct"
-            stroke="#14202e"
+            stroke={BRAND.navy}
             strokeWidth={2.5}
-            dot={{ r: 4, fill: '#14202e' }}
+            dot={{ r: 4, fill: BRAND.navy }}
             activeDot={{ r: 6 }}
             connectNulls
           />

@@ -2,21 +2,18 @@ import {
   CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { inr } from '../../lib/format.js'
-
-const SERIES_COLORS = [
-  '#14202e', '#2b6cb0', '#1a7a4c', '#b4623a',
-  '#6b46a8', '#0f766e', '#a32c2c', '#8a949e',
-]
+import { BRAND, cohortRamp } from '../../lib/chartTheme.js'
 
 /** Average monthly wage per cohort, tracked from placement onwards. */
 export default function WageChart({ rows = [], cohorts = [] }) {
   if (!cohorts.length) {
     return <div className="empty">No wage records in this slice.</div>
   }
+  const ramp = cohortRamp(cohorts.length)
   return (
     <ResponsiveContainer width="100%" height={260}>
       <LineChart data={rows} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
-        <CartesianGrid stroke="#eef1f4" vertical={false} />
+        <CartesianGrid stroke={BRAND.grid} vertical={false} />
         <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: '#dfe4e9' }} />
         <YAxis
           tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
@@ -32,7 +29,7 @@ export default function WageChart({ rows = [], cohorts = [] }) {
             type="monotone"
             dataKey={c}
             name={c}
-            stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
+            stroke={ramp[i]}
             strokeWidth={2}
             dot={{ r: 3 }}
             connectNulls

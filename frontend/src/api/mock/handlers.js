@@ -5,7 +5,8 @@
  * really filter, and withdrawing consent really removes a person's outcomes
  * from every number on the dashboard.
  */
-import { AS_OF, COHORTS, COURSES, DISTRICTS, daysBetween } from './dataset.js'
+import { AS_OF, COHORTS, COURSES, DISTRICTS, FIELD_OFFICERS, daysBetween } from './dataset.js'
+import { QUESTION_BY_ID, REVIEW_QUESTIONS, asFive, meanScore } from '../../lib/review.js'
 import * as store from './store.js'
 
 /* ------------------------------------------------------------------ */
@@ -173,6 +174,7 @@ export function getDashboard(filters = {}) {
     { months: 6, min: 136, max: 270 },
     { months: 12, min: 271, max: 9999 },
   ]
+  const wageTiers = emptyTiers()
   const wage_progression = buckets.map((b) => {
     const row = { months: b.months, label: b.months === 0 ? 'At placement' : `${b.months} mo` }
     for (const c of cohortsPresent) {
@@ -185,7 +187,10 @@ export function getDashboard(filters = {}) {
           if (!e.salary) continue
           if (e.what_happened !== 'placed' && e.what_happened !== 'still_working') continue
           const d = daysBetween(placement.date, e.date)
-          if (d >= b.min && d <= b.max) salaries.push(e.salary)
+          if (d >= b.min && d <= b.max) {
+            salaries.push(e.salary)
+            wageTiers[e.trust_level] += 1
+          }
         }
       }
       row[c] = salaries.length
@@ -204,6 +209,7 @@ export function getDashboard(filters = {}) {
     outcomes,
     retention,
     wage_progression,
+    wage_evidence: tierPercentages(wageTiers),
     cohorts_present: cohortsPresent,
     evidence_totals: tierPercentages(overallTiers),
     consent: data.consentTotals,
@@ -279,6 +285,7 @@ export function getSkillGap(filters = {}) {
   const data = store.currentData()
   const cohort = applyFilters(data.trainees, filters)
 
+  const gapTiers = emptyTiers()
   const courses = COURSES.map((def) => {
     const own = cohort.filter((t) => t.course === def.name)
     let working = 0
@@ -287,6 +294,7 @@ export function getSkillGap(filters = {}) {
       const c = classify(data.eventsByTrainee[t.id])
       if (!['employed', 'awaiting_confirmation', 'apprentice', 'self_employed'].includes(c.bucket)) continue
       working += 1
+      gapTiers[c.trust] += 1
       const role = c.event?.job_role || ''
       if (role === def.intended_role || role === `Apprentice — ${def.intended_role}` || role === `Self-employed — ${def.intended_role}`) {
         onRole += 1
@@ -325,15 +333,49 @@ export function getSkillGap(filters = {}) {
     }
   })
 
-  return { courses, districts }
+  return { courses, districts, evidence: tierPercentages(gapTiers) }
 }
 
 /* ------------------------------------------------------------------ */
 /* other endpoints                                                     */
 /* ------------------------------------------------------------------ */
 
+/** Attaches the full officer record so the table can render it directly. */
+function withOfficer(d) {
+  const officer = d.assigned_officer_id
+    ? FIELD_OFFICERS.find((o) => o.id === d.assigned_officer_id) || null
+    : null
+  return { ...d, officer }
+}
+
 export function getDisputes() {
-  return store.currentData().disputes
+  return store.currentData().disputes.map(withOfficer)
+}
+
+export function getFieldOfficers() {
+  // Live case load = seeded backlog + anything assigned during this session.
+  const assigned = store.currentData().disputes.filter((d) => d.assigned_officer_id)
+  return FIELD_OFFICERS.map((o) => ({
+    ...o,
+    active_cases: o.open_cases + assigned.filter((d) => d.assigned_officer_id === o.id).length,
+  }))
+}
+
+/**
+ * Assign, reassign, or (with a null officer) unassign a field officer on a
+ * disputed record. Assignment does not resolve the dispute — it records who is
+ * going out to establish the facts.
+ */
+export function assignFieldOfficer(disputeId, body = {}) {
+  const officerId = body.officer_id ?? null
+  store.assignFieldOfficer(disputeId, {
+    assigned_officer_id: officerId,
+    assigned_at: officerId ? new Date().toISOString().slice(0, 10) : null,
+    assigned_by: body.assigned_by ?? 'Government officer (demo)',
+    assignment_note: body.note ?? '',
+  })
+  const updated = store.currentData().disputes.find((d) => d.id === disputeId)
+  return { ok: true, dispute: updated ? withOfficer(updated) : null }
 }
 
 export function resolveDispute(id, body = {}) {
@@ -448,6 +490,100 @@ export function postCheckin(body = {}) {
   })
 
   return { ok: true, event, trainee: trainee ? { id: trainee.id, name: trainee.name } : null }
+}
+
+/* ---- post-training review ---- */
+
+export function getReview(traineeId) {
+  const data = store.currentData()
+  const review = data.reviews.find((r) => r.trainee_id === traineeId) || null
+  return { trainee_id: traineeId, completed: Boolean(review), review }
+}
+
+export function submitReview(body = {}) {
+  const raw = store.rawData()
+  const trainee = raw.trainees.find((t) => t.id === body.trainee_id)
+  const review = {
+    id: `REV-LIVE-${body.trainee_id}`,
+    trainee_id: body.trainee_id,
+    provider_id: trainee?.provider_id ?? body.provider_id ?? null,
+    course: trainee?.course ?? body.course ?? null,
+    cohort: trainee?.cohort ?? null,
+    district: trainee?.district ?? null,
+    answers: body.answers || {},
+    comment: body.comment || null,
+    submitted_at: new Date().toISOString().slice(0, 10),
+  }
+  store.saveReview(review)
+  return { ok: true, review }
+}
+
+/**
+ * Aggregate feedback for the government view.
+ *
+ * Individual responses are never returned — only counts and means. A trainee
+ * answering honestly about their trainer should not be identifiable from the
+ * oversight screen.
+ */
+export function getReviewInsights(filters = {}) {
+  const data = store.currentData()
+  const cohort = applyFilters(data.trainees, filters)
+  const ids = new Set(cohort.map((t) => t.id))
+  const reviews = data.reviews.filter((r) => ids.has(r.trainee_id))
+
+  const questions = REVIEW_QUESTIONS.map((q) => {
+    const values = reviews.map((r) => r.answers[q.id]).filter(Boolean)
+    const counts = Object.fromEntries(
+      q.options.map((o) => [o.value, values.filter((v) => v === o.value).length]),
+    )
+    const mean = meanScore(values, q.id)
+    return {
+      id: q.id,
+      label: q.shortLabel,
+      prompt: q.prompt,
+      responses: values.length,
+      mean,
+      out_of_five: asFive(mean),
+      distribution: q.options.map((o) => ({
+        value: o.value,
+        label: o.label,
+        count: counts[o.value],
+        pct: values.length ? Math.round((counts[o.value] / values.length) * 100) : 0,
+      })),
+    }
+  })
+
+  const recommend = reviews.map((r) => r.answers.recommend).filter(Boolean)
+  const wouldRecommend = recommend.filter((v) => v === 'definitely' || v === 'probably').length
+
+  // Per-centre averages, so a weak provider is visible rather than averaged away.
+  const byProvider = {}
+  for (const r of reviews) (byProvider[r.provider_id] ||= []).push(r)
+  const providers = store
+    .rawData()
+    .providers.filter((p) => byProvider[p.id]?.length >= 3)
+    .map((p) => {
+      const own = byProvider[p.id]
+      const mean = meanScore(own.map((r) => r.answers.overall_quality), 'overall_quality')
+      return {
+        id: p.id,
+        name: p.name,
+        district: p.district,
+        responses: own.length,
+        mean,
+        out_of_five: asFive(mean),
+      }
+    })
+    .sort((a, b) => (b.mean ?? 0) - (a.mean ?? 0))
+
+  return {
+    responses: reviews.length,
+    eligible: cohort.length,
+    response_rate: cohort.length ? Math.round((reviews.length / cohort.length) * 100) : 0,
+    recommend_rate: recommend.length ? Math.round((wouldRecommend / recommend.length) * 100) : null,
+    questions,
+    providers,
+  }
 }
 
 export function resetAll() {

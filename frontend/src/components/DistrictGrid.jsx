@@ -1,13 +1,5 @@
 import { int } from '../lib/format.js'
-
-/** Terracotta ramp — darker means a wider gap between intended and actual roles. */
-function shade(mismatch) {
-  if (mismatch === null || mismatch === undefined) return { bg: '#f6f8fa', fg: '#8a949e' }
-  const t = Math.min(1, Math.max(0, mismatch / 60))
-  const mix = (from, to) => Math.round(from + (to - from) * t)
-  const bg = `rgb(${mix(251, 143)}, ${mix(241, 74)}, ${mix(236, 41)})`
-  return { bg, fg: t > 0.55 ? '#fff' : '#14202e' }
-}
+import { heatShade as shade } from '../lib/chartTheme.js'
 
 const STEPS = [0, 12, 24, 36, 48, 60]
 

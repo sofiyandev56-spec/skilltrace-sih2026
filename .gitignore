@@ -4,4 +4,6 @@ dist/
 .env.local
 .DS_Store
 *.log
-.claude/
+.claude/*
+!.claude/skills/
+.playwright-mcp/
