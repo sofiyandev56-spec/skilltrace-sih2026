@@ -3,13 +3,11 @@ import { api } from '../api/client.js'
 import { useApi } from '../lib/useApi.js'
 import { longDate, relativeAge } from '../lib/format.js'
 import { useGov } from '../gov/GovContext.jsx'
+import { MINISTRY_OFFICERS } from '../api/mock/data/ministryOfficers.js'
 
-const OFFICERS = [
-  'S. Kulkarni (Pune div.)',
-  'R. Deshmukh (Nashik div.)',
-  'A. Jadhav (Nagpur div.)',
-  'M. Pawar (Latur div.)',
-]
+const OFFICERS = MINISTRY_OFFICERS.map(
+  (o) => `${o.name} (${o.district ? `${o.district} div.` : o.division})`
+)
 
 function Attempts({ n, t }) {
   return (

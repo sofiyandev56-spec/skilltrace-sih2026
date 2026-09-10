@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useGov } from '../gov/GovContext.jsx'
@@ -10,9 +10,6 @@ import { useGov } from '../gov/GovContext.jsx'
  * an option inside the ordinary login modal: reaching the governance console
  * requires an issued Officer ID, and nothing a citizen can do to their own
  * session grants it.
- *
- * Presentation only — every credential decision belongs to ministryAuth, which
- * this page reaches through loginMinistry and never inspects directly.
  */
 export default function MinistryLogin() {
   const { t } = useGov()
@@ -22,11 +19,8 @@ export default function MinistryLogin() {
 
   const [officerId, setOfficerId] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const errorId = useId()
-  const passwordRef = useRef(null)
 
   // Already signed in — send them where they were headed.
   if (isMinistry) {
@@ -43,11 +37,8 @@ export default function MinistryLogin() {
 
     if (!result.ok) {
       // One message for both failure modes, so the form cannot be used to
-      // discover which Officer IDs are real. The entered ID is kept; only the
-      // password is cleared, which is the field worth retyping.
+      // discover which Officer IDs are real.
       setError(result.reason === 'missing' ? t('mlErrorMissing') : t('mlErrorInvalid'))
-      setPassword('')
-      passwordRef.current?.focus()
       return
     }
     navigate(location.state?.from || '/ministry', { replace: true })
@@ -55,108 +46,63 @@ export default function MinistryLogin() {
 
   return (
     <div className="mlogin">
-      <div className="mlogin__grid">
-        {/* Government identity and the terms of access, stated before the
-            form rather than buried under it. */}
-        <section className="mlogin__aside">
+      <div className="mlogin__card">
+        <div className="mlogin__head">
+          <img src="/state-emblem.png" alt="" className="mlogin__emblem" />
           <p className="mlogin__eyebrow">{t('mlEyebrow')}</p>
-          <h1 className="mlogin__heading">{t('mlAccessHeading')}</h1>
-          <p className="mlogin__lede">{t('mlSubtitle')}</p>
+          <h1 className="mlogin__title">{t('mlTitle')}</h1>
+          <p className="mlogin__sub">{t('mlSubtitle')}</p>
+        </div>
 
-          <div className="mlogin__notice">
-            <span className="mlogin__notice-icon" aria-hidden="true">
-              &#128274;
+        <form className="mlogin__form" onSubmit={submit} noValidate>
+          {error ? (
+            <p className="mlogin__error" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <label className="field">
+            <span className="field__label" htmlFor="officer-id">
+              {t('mlOfficerId')}
             </span>
-            <div>
-              <strong className="mlogin__notice-title">{t('mlRestricted')}</strong>
-              <span className="mlogin__notice-body">{t('mlSecurityNotice')}</span>
-            </div>
-          </div>
-        </section>
+            <input
+              id="officer-id"
+              className="input"
+              type="text"
+              value={officerId}
+              onChange={(e) => setOfficerId(e.target.value)}
+              autoComplete="username"
+              placeholder={t('mlOfficerIdPlaceholder')}
+              aria-describedby={error ? 'mlogin-error' : undefined}
+              required
+            />
+          </label>
 
-        <section className="mlogin__panel">
-          <div className="mlogin__card">
-            <h2 className="mlogin__title">{t('mlTitle')}</h2>
+          <label className="field">
+            <span className="field__label" htmlFor="officer-pw">
+              {t('mlPassword')}
+            </span>
+            <input
+              id="officer-pw"
+              className="input"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
 
-            <form
-              className="mlogin__form"
-              onSubmit={submit}
-              aria-label={t('mlFormLabel')}
-              noValidate
-            >
-              {error ? (
-                <p className="mlogin__error" id={errorId} role="alert">
-                  <span className="mlogin__error-label">{t('mlErrorLabel')}</span>
-                  <span>{error}</span>
-                </p>
-              ) : null}
+          <button type="submit" className="btn btn--primary mlogin__submit" disabled={busy}>
+            {busy ? t('mlSigningIn') : t('mlSignIn')}
+          </button>
+        </form>
 
-              <div className="mlogin__field">
-                <label className="mlogin__label" htmlFor="officer-id">
-                  {t('mlOfficerId')}
-                </label>
-                <input
-                  id="officer-id"
-                  className="mlogin__input"
-                  type="text"
-                  value={officerId}
-                  onChange={(e) => setOfficerId(e.target.value)}
-                  autoComplete="username"
-                  autoCapitalize="characters"
-                  spellCheck="false"
-                  placeholder={t('mlOfficerIdPlaceholder')}
-                  aria-invalid={error ? true : undefined}
-                  aria-describedby={error ? errorId : undefined}
-                  required
-                />
-              </div>
+        <p className="mlogin__note">{t('mlRestricted')}</p>
 
-              <div className="mlogin__field">
-                <label className="mlogin__label" htmlFor="officer-pw">
-                  {t('mlPassword')}
-                </label>
-                <div className="mlogin__pw">
-                  <input
-                    id="officer-pw"
-                    ref={passwordRef}
-                    className="mlogin__input"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                    aria-invalid={error ? true : undefined}
-                    aria-describedby={error ? errorId : undefined}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="mlogin__pw-toggle"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-pressed={showPassword}
-                    aria-controls="officer-pw"
-                  >
-                    {showPassword ? t('mlHidePassword') : t('mlShowPassword')}
-                  </button>
-                </div>
-              </div>
-
-              <button type="submit" className="mlogin__submit" disabled={busy}>
-                {busy ? t('mlSigningIn') : t('mlSignIn')}
-              </button>
-            </form>
-          </div>
-
-          <p className="mlogin__trainee">
-            <span>{t('mlTraineePrompt')}</span>{' '}
-            <button
-              type="button"
-              className="mlogin__trainee-link"
-              onClick={() => navigate('/client')}
-            >
-              {t('mlTraineeLink')}
-            </button>
-          </p>
-        </section>
+        <button type="button" className="mlogin__back" onClick={() => navigate('/client')}>
+          {t('mlBackToTrainee')}
+        </button>
       </div>
     </div>
   )

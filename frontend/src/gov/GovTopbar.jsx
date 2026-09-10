@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
 import { LANGS } from './i18n.js'
 import { useGov } from './GovContext.jsx'
 import { useAuth } from '../auth/AuthContext.jsx'
@@ -28,10 +27,7 @@ export default function GovTopbar() {
   const menuRef = useRef(null)
   useDismiss(menuRef, () => setMenuOpen(false), menuOpen)
 
-  // The trainee sign-in prompt has no place on the officer sign-in page: the
-  // two portals take different credentials, and offering the wrong one here
-  // is how people end up trying their trainee login against this form.
-  const isAuthPage = useLocation().pathname === '/ministry/login'
+  const hi = lang === 'hi'
 
   return (
     <div className="gov-topbar">
@@ -128,6 +124,16 @@ export default function GovTopbar() {
                           ? `${identity.designation} · ${identity.officer_id}`
                           : t('citizenTrainee')}
                       </span>
+                      {isMinistry && identity.phone_no && (
+                        <span className="mono small faint" style={{ marginTop: 2 }}>
+                          📞 +91 {identity.phone_no}
+                        </span>
+                      )}
+                      {isMinistry && identity.district && (
+                        <span className="small" style={{ color: '#13529d', fontWeight: 600, marginTop: 2 }}>
+                          📍 {identity.district} District
+                        </span>
+                      )}
                     </div>
                     <div className="gov-user-dropdown__actions">
                       <button
@@ -145,9 +151,9 @@ export default function GovTopbar() {
                   </div>
                 )}
               </div>
-            ) : isAuthPage ? null : (
+            ) : (
               <button type="button" className="gov-contrast-btn" onClick={() => openLogin('select')}>
-                {t('signIn')}
+                {hi ? 'साइन इन' : 'Sign in'}
               </button>
             )}
           </div>

@@ -2378,23 +2378,6 @@ html[data-contrast="high"] .quickact {
 }
 html[data-contrast="high"] .gov-footer::before { display: none; }
 
-/* The rule above strips the gradient, and because .gov-footer paints itself
-   with the `background` shorthand that also leaves background-color at
-   transparent — light footer text over the light page. Restore an explicit
-   colour and lift the text to full strength. */
-html[data-contrast="high"] .gov-footer {
-  background-color: #06192c;
-  color: #f2f6fa;
-}
-html[data-contrast="high"] .gov-footer__link,
-html[data-contrast="high"] .gov-footer__statement,
-html[data-contrast="high"] .gov-footer__meta-item strong { color: #ffffff; }
-html[data-contrast="high"] .gov-footer__line,
-html[data-contrast="high"] .gov-footer__sub,
-html[data-contrast="high"] .gov-footer__compliance,
-html[data-contrast="high"] .gov-footer__meta-label { color: #dbe5ef; }
-html[data-contrast="high"] .gov-footer__dot { color: #8fa4ba; }
-
 /* ==================================================================
    Small-screen chrome
    The header reflows into readable rows rather than centring tall and
@@ -3117,243 +3100,185 @@ html[data-contrast="high"] .story__gap { background: #fff; }
 }
 
 /* ==================================================================
-   Ministry Officer sign-in
-   A restricted-access page: government identity and the terms of entry
-   on the left, the credential form on the right. Every colour comes from
-   a token so the high-contrast theme carries over without extra rules.
+   Officer Banner & Jurisdiction Scoping Bar
    ================================================================== */
-.gov-main-content--auth {
+.officer-banner {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid var(--border);
+  border-left: 5px solid #13529d;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.officer-banner__main {
   display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+
+.officer-banner__avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.officer-banner__emblem {
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.15));
+}
+
+.officer-banner__badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #13529d;
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+.officer-banner__identity {
+  flex: 1;
+  min-width: 280px;
+}
+
+.officer-banner__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.officer-banner__dot {
+  color: var(--border-strong);
+}
+
+.officer-banner__name {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #13529d;
+  margin: 0 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.officer-banner__id {
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: #eef4fb;
+  color: #13529d;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #c7dcf7;
+}
+
+.officer-banner__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+  color: var(--text);
+  flex-wrap: wrap;
+}
+
+.officer-banner__sep {
+  color: var(--border-strong);
+}
+
+.officer-banner__phone {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.officer-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.officer-scope-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.officer-scope-controls__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.officer-scope-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 6px 14px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+}
+
+.officer-scope-pill__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #166534;
+}
+
+.officer-scope-pill__sub {
+  font-size: 0.68rem;
+  color: #15803d;
+}
+
+.officer-banner__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.officer-banner__footer-icon {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 44px 24px 52px;
-}
-
-/* Compact chrome for the pre-authentication page. */
-.gov-identity--compact { padding: 13px 0 12px; }
-.gov-identity--compact .gov-identity__emblem { height: 54px; }
-.gov-identity--compact .gov-identity__brand { cursor: default; }
-
-.gov-footer--compact .gov-footer__inner { padding: 14px 24px 15px; }
-.gov-footer--compact .gov-footer__nav { margin-bottom: 9px; }
-.gov-footer__line {
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 7px;
-  font-size: 11.5px;
-  line-height: 1.65;
-  color: #7f93a8;
-}
-.gov-footer__dot { color: #4d6076; }
-
-/* --text-muted only reaches 3.7:1 against this page's tinted background, which
-   fails AA for the small supporting copy below. This is the same grey a shade
-   darker, at 5.5:1. */
-.mlogin { width: 100%; max-width: 1000px; --mlogin-muted: #4B6379; }
-.mlogin__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 448px;
-  gap: 60px;
-  align-items: center;
-}
-
-/* ---- Left: identity and terms of access ---- */
-.mlogin__aside { min-width: 0; }
-.mlogin__eyebrow {
-  margin: 0 0 10px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--accent-dark);
-}
-.mlogin__heading {
-  margin: 0 0 12px;
-  font-size: 1.95rem;
-  line-height: 1.22;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--navy);
-}
-.mlogin__lede {
-  margin: 0 0 22px;
-  max-width: 46ch;
-  font-size: 0.95rem;
-  line-height: 1.62;
-  color: var(--mlogin-muted);
-}
-
-/* Restricted-access notice. Deliberately not saffron: in this system
-   saffron marks something an officer can act on, and this is a condition
-   of entry rather than a task. */
-.mlogin__notice {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  max-width: 46ch;
-  padding: 13px 15px;
-  background: var(--bg-sunken);
-  border: 1px solid var(--border-strong);
-  border-left: 3px solid var(--navy-500);
-  border-radius: var(--radius);
-}
-.mlogin__notice-icon { font-size: 15px; line-height: 1.35; flex: none; }
-.mlogin__notice-title {
-  display: block;
-  font-size: 0.845rem;
-  font-weight: 700;
-  color: var(--navy-800);
-  margin-bottom: 3px;
-}
-.mlogin__notice-body {
-  display: block;
-  font-size: 0.8rem;
-  line-height: 1.55;
-  color: var(--mlogin-muted);
-}
-
-/* ---- Right: the credential card ---- */
-.mlogin__panel { min-width: 0; }
-.mlogin__card {
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-top: 3px solid var(--navy);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 26px 28px 28px;
-}
-.mlogin__title {
-  margin: 0 0 20px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
-  font-size: 1.12rem;
-  font-weight: 700;
-  color: var(--navy-800);
-}
-.mlogin__form { display: flex; flex-direction: column; gap: 16px; }
-
-.mlogin__error {
-  margin: 0;
-  padding: 11px 13px;
-  background: #fdf2f2;
-  border: 1px solid #f0c4c0;
-  border-left: 3px solid var(--tier-conflict);
-  border-radius: var(--radius);
-  font-size: 0.83rem;
-  line-height: 1.55;
-  color: #7d1d16;
-}
-.mlogin__error-label {
-  display: block;
-  font-weight: 700;
-  color: var(--tier-conflict);
-  margin-bottom: 2px;
-}
-
-.mlogin__field { display: flex; flex-direction: column; gap: 6px; }
-.mlogin__label {
-  font-size: 0.815rem;
-  font-weight: 650;
-  color: var(--navy-800);
-}
-.mlogin__input {
-  width: 100%;
-  padding: 10px 12px;
-  font: inherit;
-  font-size: 0.9rem;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-}
-.mlogin__input::placeholder { color: var(--text-faint); }
-.mlogin__input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
-  border-color: var(--accent);
-}
-.mlogin__input[aria-invalid='true'] { border-color: var(--tier-conflict); }
-
-.mlogin__pw { position: relative; }
-.mlogin__pw .mlogin__input { padding-right: 78px; }
-.mlogin__pw-toggle {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  transform: translateY(-50%);
-  padding: 5px 7px;
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 650;
-  color: var(--navy-500);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.mlogin__pw-toggle:hover { color: var(--navy); background: var(--bg-subtle); }
-.mlogin__pw-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-
-.mlogin__submit {
-  margin-top: 4px;
-  width: 100%;
-  padding: 12px 20px;
-  font: inherit;
-  font-size: 0.94rem;
-  font-weight: 650;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #16a34a;
   color: #fff;
-  background: var(--navy);
-  border: 1px solid var(--navy);
-  border-radius: var(--radius);
-  cursor: pointer;
+  font-size: 10px;
+  font-weight: bold;
 }
-.mlogin__submit:hover:not(:disabled) { background: var(--navy-700); border-color: var(--navy-700); }
-.mlogin__submit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.mlogin__submit:disabled { opacity: 0.62; cursor: not-allowed; }
 
-/* Secondary by construction: plain text, no button affordance, below the
-   card so it never competes with Sign in. */
-.mlogin__trainee {
-  margin: 15px 0 0;
-  text-align: center;
-  font-size: 0.815rem;
-  color: var(--mlogin-muted);
-}
-.mlogin__trainee-link {
-  padding: 0;
-  font: inherit;
-  font-weight: 650;
-  color: var(--navy-500);
-  background: none;
-  border: 0;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-.mlogin__trainee-link:hover { color: var(--navy); }
-.mlogin__trainee-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-@media (max-width: 900px) {
-  .gov-main-content--auth { padding: 30px 20px 36px; }
-  .mlogin__grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 26px;
-    justify-items: stretch;
+@media (max-width: 768px) {
+  .officer-banner__main {
+    flex-direction: column;
+    align-items: flex-start;
   }
-  .mlogin__panel { max-width: 480px; width: 100%; }
-  .mlogin__aside { max-width: 480px; }
-  .mlogin__heading { font-size: 1.6rem; }
-  .mlogin__lede { margin-bottom: 18px; }
+  .officer-scope-controls {
+    align-items: flex-start;
+  }
 }
 
-@media (max-width: 560px) {
-  .gov-main-content--auth { padding: 22px 16px 30px; }
-  .mlogin__grid { gap: 22px; }
-  .mlogin__card { padding: 22px 18px 24px; }
-  .mlogin__heading { font-size: 1.42rem; }
-  .mlogin__lede { font-size: 0.9rem; }
-  .gov-identity--compact .gov-identity__emblem { height: 44px; }
-  .gov-footer--compact .gov-footer__inner { padding: 13px 16px 14px; }
-}
+

@@ -18,6 +18,8 @@ import RetentionChart from '../components/charts/RetentionChart.jsx'
 import WageChart from '../components/charts/WageChart.jsx'
 import SkillGapChart from '../components/charts/SkillGapChart.jsx'
 import { useGov } from '../gov/GovContext.jsx'
+import { useAuth } from '../auth/AuthContext.jsx'
+import OfficerHeader from '../components/OfficerHeader.jsx'
 
 const SNAP_KEY = 'skilltrace.snapshot.'
 
@@ -49,9 +51,17 @@ function writeSnapshot(key, snap) {
 
 export default function Dashboard() {
   const { t } = useGov()
-  const [filters, setFilters] = useState({})
+  const { officer } = useAuth()
+  const [filters, setFilters] = useState(() => (officer?.district ? { district: officer.district } : {}))
   const [nonce, setNonce] = useState(0)
   const [externalChange, setExternalChange] = useState(null)
+
+  // Synchronize filter when officer session district is available
+  useEffect(() => {
+    if (officer?.district) {
+      setFilters((prev) => (prev.district ? prev : { ...prev, district: officer.district }))
+    }
+  }, [officer?.officer_id, officer?.district])
 
   const filtersKey = useMemo(() => sliceKey(filters), [filters])
 
@@ -140,6 +150,14 @@ export default function Dashboard() {
             {t('refreshFigures')}
           </button>
         </div>
+      )}
+
+      {officer && (
+        <OfficerHeader
+          officer={officer}
+          filters={filters}
+          onFilterChange={setFilters}
+        />
       )}
 
       <FilterBar
