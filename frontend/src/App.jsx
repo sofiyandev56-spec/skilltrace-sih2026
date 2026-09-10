@@ -59,7 +59,14 @@ function useNavCounts() {
 export default function App() {
   const { t } = useGov()
   const counts = useNavCounts()
+  const { pathname } = useLocation()
   useDocumentTitle()
+
+  // Authentication pages carry only the government identity and the global
+  // accessibility controls. Showing the governance navigation to someone who
+  // has not signed in would advertise the console's shape and make the page
+  // feel like the inside of the application before any credential is checked.
+  const isAuthPage = pathname === '/ministry/login'
 
   const resetDemo = () => {
     mock.resetAll()
@@ -68,7 +75,7 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <div className="gov-layout-root">
+      <div className={`gov-layout-root${isAuthPage ? ' gov-layout-root--auth' : ''}`}>
         {/* First focusable element on the page, whatever order the chrome
             bands are rendered in below. */}
         <a className="gov-skip-link" href="#main-content">
@@ -76,7 +83,7 @@ export default function App() {
         </a>
 
       <GovTopbar />
-      <GovNav counts={counts} onResetDemo={resetDemo} />
+      {isAuthPage ? null : <GovNav counts={counts} onResetDemo={resetDemo} />}
 
       <div className="gov-tricolor" aria-hidden="true">
         <span className="gov-tricolor__saffron" />
@@ -84,10 +91,14 @@ export default function App() {
         <span className="gov-tricolor__green" />
       </div>
 
-      <GovIdentity />
-      <GovBreadcrumbs />
+      <GovIdentity compact={isAuthPage} />
+      {isAuthPage ? null : <GovBreadcrumbs />}
 
-      <main className="gov-main-content" id="main-content" tabIndex={-1}>
+      <main
+        className={`gov-main-content${isAuthPage ? ' gov-main-content--auth' : ''}`}
+        id="main-content"
+        tabIndex={-1}
+      >
         <Routes>
           {/* ---- Ministry: governance, analytics, adjudication ---- */}
           <Route path="/ministry/login" element={<MinistryLogin />} />
@@ -117,7 +128,7 @@ export default function App() {
         </Routes>
       </main>
 
-      <GovFooter />
+      <GovFooter compact={isAuthPage} />
 
       <div className="gov-tricolor gov-tricolor--bottom" aria-hidden="true">
         <span className="gov-tricolor__saffron" />

@@ -12,14 +12,18 @@ import ModeBadge from '../components/ModeBadge.jsx'
  * Both language forms of the government's name are shown at once, as they are
  * on official portals; the selected language leads.
  */
-export default function GovIdentity() {
+export default function GovIdentity({ compact = false }) {
   const { isMinistry } = useAuth()
   const home = isMinistry ? '/ministry' : '/client'
   const { t, lang } = useGov()
-  const other = lang === 'hi' ? STRINGS.en : STRINGS.hi
+  // The second line carries the government's name in the other official
+  // script. English pairs with Hindi; Hindi and Marathi both pair with
+  // English, since pairing Marathi with Hindi would print the same words
+  // twice.
+  const other = lang === 'en' ? STRINGS.hi : STRINGS.en
 
   return (
-    <div className="gov-identity">
+    <div className={`gov-identity${compact ? ' gov-identity--compact' : ''}`}>
       <div className="gov-identity__inner">
         <div className="gov-identity__org">
           <img
@@ -38,10 +42,19 @@ export default function GovIdentity() {
 
         <div className="gov-identity__portal">
           <ModeBadge />
-          <Link to={home} className="gov-identity__brand">
-            <span className="gov-identity__name">{t('portalName')}</span>
-            <span className="gov-identity__tagline">{t('portalTagline')}</span>
-          </Link>
+          {/* Before sign-in there is nowhere authorised to navigate to, so the
+              brand states the portal's identity instead of offering a link. */}
+          {compact ? (
+            <span className="gov-identity__brand">
+              <span className="gov-identity__name">{t('portalName')}</span>
+              <span className="gov-identity__tagline">{t('portalTagline')}</span>
+            </span>
+          ) : (
+            <Link to={home} className="gov-identity__brand">
+              <span className="gov-identity__name">{t('portalName')}</span>
+              <span className="gov-identity__tagline">{t('portalTagline')}</span>
+            </Link>
+          )}
         </div>
       </div>
     </div>
