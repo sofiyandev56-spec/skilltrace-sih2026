@@ -8,13 +8,13 @@ const AuthContext = createContext(null)
 const AUTH_STORAGE_KEY = 'skilltrace.session_user'
 
 export const DEMO_GOV_USER = {
-  id: 'GOV-MSDE-042',
-  name: 'Dr. S. K. Sharma, IES',
-  email: 'officer@msde.gov.in',
+  id: 'OFF000001',
+  name: 'Chandrashekhar Reddy',
+  email: 'c.reddy@msde.gov.in',
   role: 'government',
-  designation: 'Director (Monitoring & Evaluation)',
+  designation: 'Joint Secretary (Monitoring & Evaluation)',
   ministry: 'Ministry of Skill Development and Entrepreneurship',
-  phone: '+91 98100 12345',
+  phone: '+91 99823 72846',
   verified: true,
   lastLogin: '2026-09-10 09:30 IST',
 }

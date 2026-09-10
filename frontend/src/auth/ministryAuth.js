@@ -39,9 +39,13 @@ function toSession(officer) {
   return {
     officer_id: officer.officer_id,
     name: officer.name,
+    phone_no: officer.phone_no,
     designation: officer.designation,
     cadre: officer.cadre,
     division: officer.division,
+    // Drives the dashboard's default jurisdiction: a district officer opens
+    // on their own district rather than on all of Maharashtra.
+    district: officer.district,
     email: officer.email,
     scope: officer.scope,
     role: 'ministry',

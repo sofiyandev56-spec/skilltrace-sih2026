@@ -142,8 +142,15 @@ const POLICY_SECTIONS = [
   },
 ]
 
+/** Matches the topbar's steps; textSize is a named step, not a multiplier. */
+const MODAL_TEXT_SIZES = [
+  { key: 'small', glyph: 'A', labelKey: 'decrease', px: 10 },
+  { key: 'normal', glyph: 'A', labelKey: 'normal', px: 12 },
+  { key: 'large', glyph: 'A', labelKey: 'increase', px: 14 },
+]
+
 export default function GovPolicyModal() {
-  const { policyModal, setPolicyTab, closePolicy, lang } = useGov()
+  const { policyModal, setPolicyTab, closePolicy, lang, textSize, setTextSize, t } = useGov()
   if (!policyModal.open) return null
 
   const active = POLICY_SECTIONS.find((s) => s.id === policyModal.tab) || POLICY_SECTIONS[0]
@@ -156,14 +163,39 @@ export default function GovPolicyModal() {
             <span className="gov-modal__tag">GIGW 3.0 / भारत सरकार</span>
             <h3>{lang === 'hi' ? active.titleHi : active.title}</h3>
           </div>
-          <button
-            type="button"
-            className="gov-modal__close"
-            onClick={closePolicy}
-            aria-label="Close modal"
-          >
-            &times;
-          </button>
+          <div className="gov-modal__header-actions">
+            {/* These are the longest passages of text in the product, so the
+                text-size control belongs here as well as in the topbar. */}
+            <div
+              className="gov-text-controls gov-text-controls--modal"
+              role="group"
+              aria-label={t('textSize')}
+            >
+              <span className="gov-text-controls__label">{t('textSize')}</span>
+              {MODAL_TEXT_SIZES.map((size) => (
+                <button
+                  key={size.key}
+                  type="button"
+                  className="gov-text-btn"
+                  aria-pressed={textSize === size.key}
+                  aria-label={t(size.labelKey)}
+                  title={t(size.labelKey)}
+                  onClick={() => setTextSize(size.key)}
+                  style={{ fontSize: size.px }}
+                >
+                  {size.glyph}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="gov-modal__close"
+              onClick={closePolicy}
+              aria-label={t('closeDialog')}
+            >
+              &times;
+            </button>
+          </div>
         </div>
 
         <div className="gov-modal__layout">

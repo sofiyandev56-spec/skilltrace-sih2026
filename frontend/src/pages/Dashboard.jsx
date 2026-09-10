@@ -18,6 +18,8 @@ import RetentionChart from '../components/charts/RetentionChart.jsx'
 import WageChart from '../components/charts/WageChart.jsx'
 import SkillGapChart from '../components/charts/SkillGapChart.jsx'
 import { useGov } from '../gov/GovContext.jsx'
+import { useAuth } from '../auth/AuthContext.jsx'
+import OfficerHeader from '../components/OfficerHeader.jsx'
 
 const SNAP_KEY = 'skilltrace.snapshot.'
 
@@ -49,7 +51,12 @@ function writeSnapshot(key, snap) {
 
 export default function Dashboard() {
   const { t } = useGov()
-  const [filters, setFilters] = useState({})
+  const { officer } = useAuth()
+  // A district officer opens on their own district. Their posting is the
+  // default view, not a filter they have to remember to apply.
+  const [filters, setFilters] = useState(() =>
+    officer?.district ? { district: officer.district } : {},
+  )
   const [nonce, setNonce] = useState(0)
   const [externalChange, setExternalChange] = useState(null)
 
@@ -141,6 +148,10 @@ export default function Dashboard() {
           </button>
         </div>
       )}
+
+      {officer ? (
+        <OfficerHeader officer={officer} filters={filters} onFilterChange={setFilters} />
+      ) : null}
 
       <FilterBar
         filters={filters}

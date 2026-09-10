@@ -3465,3 +3465,140 @@ html[data-contrast="high"] .story__gap { background: #fff; }
 @media (max-width: 560px) {
   .bankrow__chart { height: 38px; gap: 1px; }
 }
+
+/* ==================================================================
+   Officer banner — who is signed in and what they may see
+   ================================================================== */
+.officer {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--navy);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+.officer__main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  flex-wrap: wrap;
+}
+.officer__seal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+}
+.officer__emblem { height: 40px; width: auto; }
+.officer__badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--navy-800);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.officer__identity { flex: 1 1 300px; min-width: 0; }
+.officer__eyebrow {
+  margin: 0 0 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.officer__dot { margin: 0 6px; }
+.officer__name {
+  margin: 0 0 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--navy-800);
+}
+.officer__id {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1px 6px;
+}
+.officer__meta {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: #4B6379;
+}
+.officer__meta strong { color: var(--navy-700); }
+.officer__sep { margin: 0 8px; color: var(--border-strong); }
+
+.officer__actions { flex: none; margin-left: auto; }
+.officer__scope { display: flex; flex-direction: column; gap: 5px; }
+.officer__scope-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.officer__toggle { display: flex; gap: 0; }
+.officer__toggle .btn { border-radius: 0; }
+.officer__toggle .btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.officer__toggle .btn:last-child { border-radius: 0 var(--radius) var(--radius) 0; margin-left: -1px; }
+
+.officer__pill {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 13px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  text-align: right;
+}
+.officer__pill-title { font-size: 0.8rem; font-weight: 700; color: var(--navy-800); }
+.officer__pill-sub { font-size: 0.7rem; color: #4B6379; }
+
+.officer__footer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: #4B6379;
+}
+.officer__footer-tick { color: var(--tier-high); font-weight: 700; flex: none; }
+
+@media (max-width: 900px) {
+  .officer__actions { margin-left: 0; width: 100%; }
+  .officer__pill { text-align: left; }
+}
+@media (max-width: 560px) {
+  .officer__main { padding: 12px 14px; gap: 12px; }
+  .officer__toggle { flex-wrap: wrap; }
+  .officer__footer { padding: 9px 14px; }
+}
+
+/* Text-size control inside the policy modal, where the longest passages are. */
+.gov-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.gov-text-controls--modal { border: 0; padding: 0; }
