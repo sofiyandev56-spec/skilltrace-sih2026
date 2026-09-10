@@ -279,10 +279,11 @@ a { color: var(--accent-dark); }
 
 /* 3. Sovereign Identity Bar */
 .gov-identity {
-  /* Eased into the topbar above and the nav below rather than butting up
-     against them as a flat white slab. */
-  background: linear-gradient(180deg, #fdfefe 0%, #f7fafc 62%, #eef3f8 100%);
-  border-bottom: 1px solid var(--border);
+  /* Sits directly under the tricolour, above both dark bands. Opens bright at
+     the flag and settles slightly cooler where it meets the utility strip, so
+     the white block and the navy below it are not a hard collision. No bottom
+     border — the dark band provides the edge. */
+  background: linear-gradient(180deg, #ffffff 0%, #fafcfd 55%, #eef2f7 100%);
   padding: 20px 0 18px;
 }
 .gov-identity__inner {
@@ -2298,3 +2299,17 @@ html[data-contrast="high"] .gov-footer::before { display: none; }
   .client-top h1 { font-size: 22px; }
   .rategrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ==================================================================
+   Chrome order: identity above, dark bands grouped below
+   ================================================================== */
+
+/* The utility strip and the primary nav are now adjacent dark bands. A single
+   hairline keeps them legible as two bars without a hard colour step. */
+.gov-topbar {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.gov-nav { border-top: 0; }
+
+html[data-contrast="high"] .gov-identity { background-image: none; }

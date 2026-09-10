@@ -55,6 +55,7 @@ function useNavCounts() {
 }
 
 export default function App() {
+  const { t } = useGov()
   const counts = useNavCounts()
   useDocumentTitle()
 
@@ -66,14 +67,20 @@ export default function App() {
   return (
     <ToastProvider>
       <div className="gov-layout-root">
-      <div className="gov-tricolor" aria-hidden="true">
+        {/* First focusable element on the page, whatever order the chrome
+            bands are rendered in below. */}
+        <a className="gov-skip-link" href="#main-content">
+          {t('skipToMain')}
+        </a>
+
+        <div className="gov-tricolor" aria-hidden="true">
         <span className="gov-tricolor__saffron" />
         <span className="gov-tricolor__white" />
         <span className="gov-tricolor__green" />
       </div>
 
-      <GovTopbar />
       <GovIdentity />
+      <GovTopbar />
 
       <GovNav counts={counts} onResetDemo={resetDemo} />
       <GovBreadcrumbs />

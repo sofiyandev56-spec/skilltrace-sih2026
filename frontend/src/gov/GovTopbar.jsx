@@ -27,12 +27,7 @@ export default function GovTopbar() {
   const hi = lang === 'hi'
 
   return (
-    <>
-      <a className="gov-skip-link" href="#main-content">
-        {t('skipToMain')}
-      </a>
-
-      <div className="gov-topbar">
+    <div className="gov-topbar">
         <div className="gov-topbar__inner">
           {/* Utilities only. The government's identity belongs to the masthead
               below, and repeating it here just said the same thing twice. */}
@@ -168,7 +163,6 @@ export default function GovTopbar() {
             )}
           </div>
         </div>
-      </div>
-    </>
+    </div>
   )
 }
