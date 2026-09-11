@@ -1,90 +1,69 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { currentData } from '../api/mock/store.js'
-import * as ministryAuth from './ministryAuth.js'
+import * as backendAuth from './backendAuth.js'
 
 const AuthContext = createContext(null)
 
-const AUTH_STORAGE_KEY = 'skilltrace.session_user'
-
-export const DEMO_GOV_USER = {
-  id: 'OFF000001',
-  name: 'Chandrashekhar Reddy',
-  email: 'c.reddy@msde.gov.in',
-  role: 'government',
-  designation: 'Joint Secretary (Monitoring & Evaluation)',
-  ministry: 'Ministry of Skill Development and Entrepreneurship',
-  phone: '+91 99823 72846',
-  verified: true,
-  lastLogin: '2026-09-10 09:30 IST',
-}
-
-export const DEMO_CLIENT_USER = {
-  id: 'TRN-0001',
-  name: 'Aarti Patil',
-  phone: '+91 91256 71886',
-  email: 'aarti.patil@email.com',
-  role: 'client',
-  course: 'General Duty Assistant',
-  district: 'Nashik',
-  category: 'General',
-  gender: 'Female',
-  age_group: '25-34',
-  employer: 'Sanjeevani Hospital',
-  job_role: 'Healthcare Assistant',
-  monthly_salary: 14000,
-  verified_status: 'employed',
-  verified_milestone: '3+ months at same employer',
-  trust_level: 'high',
-  certification_date: '15 Jan 2025',
-  placement_date: '28 Jan 2025',
-  verified: true,
-}
+/**
+ * The single authenticated session, owned by the backend.
+ *
+ * One sign-in, one token, one role — and the role is whatever the server
+ * signed into the token, never something the browser picks. `user`,
+ * `officer` and `employer` below are three views onto that one session, kept
+ * because the existing screens read them by those names; they are derived,
+ * not independent, so there is no way to hold two roles at once or to
+ * promote yourself by writing to state.
+ */
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 export function AuthProvider({ children }) {
   const navigate = useNavigate()
 
-  // The trainee session. Persisted across browser restarts — a citizen
-  // checking their own record should not have to sign in every visit.
-  const [user, setUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY)
-      return stored ? JSON.parse(stored) : null
-    } catch {
-      return null
-    }
-  })
+  const [session, setSession] = useState(null)
+  const [restoring, setRestoring] = useState(true)
 
-  // The ministry session is deliberately separate: different store, different
-  // lifetime, different credentials. Holding one never implies the other.
-  const [officer, setOfficer] = useState(() => ministryAuth.readSession())
-
-  // Modal flow state
   const [modalState, setModalState] = useState({
     isOpen: false,
-    step: 'select', // 'select' | 'phone' | 'otp' | 'profile' | 'gov'
+    step: 'select',
     phone: '',
-    generatedOtp: '123456',
     pendingUser: null,
     error: '',
     loading: false,
   })
 
-  // Persist session
+  // On boot, a stored token is re-validated against /auth/me rather than
+  // trusted. A token whose account was deleted or demoted resolves to null
+  // here instead of granting whatever role it was issued with.
   useEffect(() => {
-    if (user) {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user))
-    } else {
-      localStorage.removeItem(AUTH_STORAGE_KEY)
+    let alive = true
+    const restore = async () => {
+      const token = backendAuth.getToken()
+      if (!token) {
+        if (alive) setRestoring(false)
+        return
+      }
+      const fresh = await backendAuth.me(token)
+      if (!alive) return
+      if (!fresh) backendAuth.clearToken()
+      setSession(fresh)
+      setRestoring(false)
     }
-  }, [user])
+    restore()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const role = session?.role ?? null
+  const isMinistry = role === 'government'
+  const isClient = role === 'client'
+  const isEmployer = role === 'employer'
 
   const openLogin = (step = 'select') => {
     setModalState({
       isOpen: true,
       step,
       phone: '',
-      generatedOtp: '123456',
       pendingUser: null,
       error: '',
       loading: false,
@@ -99,167 +78,198 @@ export function AuthProvider({ children }) {
     setModalState((prev) => ({ ...prev, step, error: '', loading: false, ...extras }))
   }
 
-  // Request OTP for phone
-  const requestOtp = (rawPhone) => {
-    const clean = rawPhone.replace(/\D/g, '')
-    if (clean.length !== 10) {
-      setModalState((prev) => ({ ...prev, error: 'Please enter a valid 10-digit Indian mobile number.' }))
-      return false
-    }
-    if (!['6', '7', '8', '9'].includes(clean[0])) {
-      setModalState((prev) => ({ ...prev, error: 'Indian mobile numbers must start with 6, 7, 8, or 9.' }))
-      return false
-    }
+  /** Where a session belongs once it exists. */
+  const homeFor = (r) =>
+    r === 'government' ? '/ministry' : r === 'employer' ? '/employer' : '/client'
 
-    // Generate fixed/predictable 6-digit OTP for demo simplicity, default 123456
-    const otp = '123456'
-    setModalState((prev) => ({
-      ...prev,
-      loading: true,
-      error: '',
-    }))
-
-    setTimeout(() => {
-      setModalState((prev) => ({
-        ...prev,
-        step: 'otp',
-        phone: clean,
-        generatedOtp: otp,
-        loading: false,
-      }))
-    }, 400)
-
-    return true
+  const adopt = (next, { navigateHome = true } = {}) => {
+    setSession(next)
+    setModalState((prev) => ({ ...prev, isOpen: false, loading: false, error: '' }))
+    if (navigateHome && next) navigate(homeFor(next.role), { replace: true })
   }
 
-  // Verify OTP
-  const verifyOtp = (enteredOtp) => {
-    if (enteredOtp !== modalState.generatedOtp && enteredOtp !== '123456') {
-      setModalState((prev) => ({ ...prev, error: 'Incorrect OTP. Please enter the 6-digit code (use 123456 for demo).' }))
-      return false
-    }
+  /* ---- password sign-in ------------------------------------------- */
 
-    setModalState((prev) => ({ ...prev, loading: true, error: '' }))
-
-    setTimeout(() => {
-      // Find matching trainee in dataset or check if new user
-      const data = currentData()
-      const formattedPhone = `+91 ${modalState.phone.slice(0, 5)} ${modalState.phone.slice(5)}`
-      const matchedTrainee = (data?.trainees || []).find((t) => {
-        const cleanTPhone = (t.phone || '').replace(/\D/g, '')
-        return cleanTPhone.endsWith(modalState.phone) || cleanTPhone === modalState.phone
-      })
-
-      if (matchedTrainee) {
-        // Returning client user found in database
-        const clientUser = {
-          ...matchedTrainee,
-          role: 'client',
-          phone: formattedPhone,
-          verified: true,
-          monthly_salary: matchedTrainee.salary || 14000,
-          employer: matchedTrainee.employer || 'Sanjeevani Hospital',
-          verified_status: matchedTrainee.outcome || 'employed',
-          verified_milestone: '3+ months at same employer',
-          trust_level: 'high',
-          certification_date: '15 Jan 2025',
-          placement_date: '28 Jan 2025',
-        }
-        setUser(clientUser)
-        setModalState((prev) => ({ ...prev, isOpen: false, loading: false }))
-        navigate('/client')
-      } else {
-        // First-time user: needs minimal profile setup
-        setModalState((prev) => ({
-          ...prev,
-          step: 'profile',
-          loading: false,
-          pendingUser: {
-            phone: formattedPhone,
-            role: 'client',
-            verified: true,
-          },
-        }))
-      }
-    }, 500)
-
-    return true
-  }
-
-  // Complete profile for first-time user
-  const completeProfile = (profileData) => {
-    const newUser = {
-      id: `TRN-${Math.floor(1000 + Math.random() * 9000)}`,
-      name: profileData.name.trim(),
-      course: profileData.course,
-      district: profileData.district,
-      category: profileData.category,
-      phone: modalState.pendingUser?.phone || `+91 ${modalState.phone}`,
-      role: 'client',
-      verified: true,
-      employer: profileData.employer || 'Self-Employed / Enrolled',
-      monthly_salary: 12000,
-      verified_status: 'awaiting_confirmation',
-      verified_milestone: 'Enrolment Verified',
-      trust_level: 'medium',
-      certification_date: '2026-06-10',
-    }
-
-    setUser(newUser)
-    setModalState((prev) => ({ ...prev, isOpen: false, loading: false }))
-    navigate('/client')
-  }
-
-  // Continue with Google
-  const loginGoogle = () => {
-    setModalState((prev) => ({ ...prev, loading: true, error: '' }))
-    setTimeout(() => {
-      // Defaults to Aarti Patil (Client) unless already configured
-      setUser(DEMO_CLIENT_USER)
-      setModalState((prev) => ({ ...prev, isOpen: false, loading: false }))
-      navigate('/client')
-    }, 450)
-  }
-
-  // Government Officer Login
   /**
-   * Ministry sign-in. Delegates the credential check to ministryAuth, which is
-   * the only module that can see the officer list — this function never
-   * decides on its own that someone is an officer.
+   * Ministry sign-in. The server authenticates; this only refuses to seat a
+   * session that did not come back as a government role, so a valid trainee
+   * credential entered on the officer form cannot open the console.
    */
-  const loginMinistry = (officerId, password) =>
+  const loginMinistry = async (identifier, password) => {
+    const res = await backendAuth.login(identifier, password)
+    if (!res.ok) return res
+    if (res.session?.role !== 'government') {
+      backendAuth.clearToken()
+      return { ok: false, reason: 'invalid' }
+    }
+    adopt(res.session, { navigateHome: false })
+    return { ok: true, officer: res.session }
+  }
+
+  /** Trainee/employer sign-in through the ordinary modal. */
+  const loginPassword = async (identifier, password) => {
+    const res = await backendAuth.login(identifier, password)
+    if (!res.ok) {
+      setModalState((prev) => ({ ...prev, loading: false, error: 'invalid' }))
+      return res
+    }
+    adopt(res.session)
+    return res
+  }
+
+  /* ---- Google ------------------------------------------------------ */
+
+  const loadGoogle = () =>
     new Promise((resolve) => {
-      const result = ministryAuth.authenticate(officerId, password)
-      if (!result.ok) {
-        resolve(result)
-        return
-      }
-      ministryAuth.saveSession(result.officer)
-      setOfficer(result.officer)
-      resolve(result)
+      if (window.google?.accounts?.oauth2) return resolve(window.google)
+      let tries = 0
+      const tick = setInterval(() => {
+        tries += 1
+        if (window.google?.accounts?.oauth2) {
+          clearInterval(tick)
+          resolve(window.google)
+        } else if (tries > 40) {
+          clearInterval(tick)
+          resolve(null)
+        }
+      }, 100)
     })
 
-  const logoutMinistry = () => {
-    ministryAuth.clearSession()
-    setOfficer(null)
-    navigate('/ministry/login', { replace: true })
+  /**
+   * Google sign-in. The role is decided by the backend from its own
+   * whitelist — `preferredRole` is a hint the server may ignore, so signing
+   * in with Google can never by itself produce an officer session.
+   */
+  const loginGoogle = async (preferredRole = 'client') => {
+    setModalState((prev) => ({ ...prev, loading: true, error: '' }))
+
+    if (!GOOGLE_CLIENT_ID) {
+      setModalState((prev) => ({ ...prev, loading: false, error: 'google_unconfigured' }))
+      return { ok: false, reason: 'unconfigured' }
+    }
+
+    const google = await loadGoogle()
+    if (!google) {
+      setModalState((prev) => ({ ...prev, loading: false, error: 'google_unavailable' }))
+      return { ok: false, reason: 'unavailable' }
+    }
+
+    return new Promise((resolve) => {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'openid email profile',
+        callback: async (response) => {
+          if (!response?.access_token) {
+            setModalState((prev) => ({ ...prev, loading: false, error: 'google_cancelled' }))
+            resolve({ ok: false, reason: 'cancelled' })
+            return
+          }
+          try {
+            const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${response.access_token}` },
+            })
+            const profile = await profileRes.json()
+            const out = await backendAuth.loginGoogle({
+              email: profile.email,
+              name: profile.name,
+              preferredRole,
+            })
+            if (!out.ok) {
+              setModalState((prev) => ({ ...prev, loading: false, error: 'google_rejected' }))
+              resolve(out)
+              return
+            }
+            adopt(out.session)
+            resolve(out)
+          } catch {
+            setModalState((prev) => ({ ...prev, loading: false, error: 'google_unavailable' }))
+            resolve({ ok: false, reason: 'unavailable' })
+          }
+        },
+      })
+      client.requestAccessToken()
+    })
   }
 
-  /** Ends the trainee session only. The ministry session has its own exit. */
-  const logout = () => {
-    setUser(null)
-    navigate('/client', { replace: true })
+  /* ---- WhatsApp OTP ------------------------------------------------ */
+
+  const requestOtp = async (rawPhone) => {
+    const clean = String(rawPhone || '').replace(/\D/g, '')
+    if (clean.length !== 10 || !['6', '7', '8', '9'].includes(clean[0])) {
+      setModalState((prev) => ({ ...prev, error: 'phone_invalid' }))
+      return false
+    }
+    setModalState((prev) => ({ ...prev, loading: true, error: '' }))
+    const res = await backendAuth.requestOtp(clean)
+    if (!res.ok) {
+      setModalState((prev) => ({ ...prev, loading: false, error: 'otp_send_failed' }))
+      return false
+    }
+    setModalState((prev) => ({ ...prev, step: 'otp', phone: clean, loading: false }))
+    return true
   }
+
+  const verifyOtp = async (enteredOtp) => {
+    setModalState((prev) => ({ ...prev, loading: true, error: '' }))
+    const res = await backendAuth.verifyOtp(modalState.phone, String(enteredOtp || '').trim())
+    if (!res.ok) {
+      setModalState((prev) => ({ ...prev, loading: false, error: 'otp_invalid' }))
+      return false
+    }
+    if (res.session) {
+      adopt(res.session)
+      return true
+    }
+    // Verified, but the number is not on a record yet.
+    setModalState((prev) => ({
+      ...prev,
+      step: 'profile',
+      loading: false,
+      pendingUser: { phone: modalState.phone, role: 'client' },
+    }))
+    return true
+  }
+
+  const completeProfile = async (profileData) => {
+    setModalState((prev) => ({ ...prev, loading: true, error: '' }))
+    const res = await backendAuth.loginGoogle({
+      email: profileData.email || `${modalState.phone}@skilltrace.local`,
+      name: profileData.name?.trim(),
+      preferredRole: 'client',
+    })
+    if (!res.ok) {
+      setModalState((prev) => ({ ...prev, loading: false, error: 'profile_failed' }))
+      return false
+    }
+    adopt(res.session)
+    return true
+  }
+
+  /* ---- exit -------------------------------------------------------- */
+
+  const endSession = (to) => {
+    backendAuth.clearToken()
+    setSession(null)
+    navigate(to, { replace: true })
+  }
+
+  const logout = () => endSession('/client')
+  const logoutMinistry = () => endSession('/ministry/login')
 
   return (
     <AuthContext.Provider
       value={{
-        user,
-        officer,
-        isAuthenticated: !!user,
-        isMinistry: !!officer,
-        // Role is derived from which session actually exists, never chosen.
-        role: officer ? 'ministry' : user ? 'client' : null,
+        // Three views onto one session — never three sessions.
+        user: isClient ? session : null,
+        officer: isMinistry ? session : null,
+        employer: isEmployer ? session : null,
+        session,
+        restoring,
+        isAuthenticated: isClient,
+        isMinistry,
+        isEmployer,
+        role: isMinistry ? 'ministry' : role,
+        googleConfigured: Boolean(GOOGLE_CLIENT_ID),
         modalState,
         openLogin,
         closeLogin,
@@ -268,6 +278,7 @@ export function AuthProvider({ children }) {
         verifyOtp,
         completeProfile,
         loginGoogle,
+        loginPassword,
         loginMinistry,
         logoutMinistry,
         logout,

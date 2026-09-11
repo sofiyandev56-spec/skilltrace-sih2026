@@ -209,14 +209,16 @@ def login(creds: LoginRequest, db: Session = Depends(get_db)):
         )
 
     # Password check
+    # The password must be this account's own. A shared list of demo passwords
+    # used to be accepted for ANY account here, which meant knowing any address
+    # and the string "password123" was enough to open the Master Sovereign
+    # Administrator session. The seeded accounts already carry these passwords
+    # individually, so the demo logins are unaffected by requiring a real match.
     if not verify_password(creds.password, user.hashed_password):
-        # Demo ease of testing: accept "password123" or default role passwords
-        demo_passwords = ["Gov@2026Password", "User@2026Password", "Employer@2026Password", "password123"]
-        if creds.password not in demo_passwords:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid password provided."
-            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials."
+        )
 
     token = create_access_token({"sub": user.id, "role": user.role, "name": user.name})
     return {

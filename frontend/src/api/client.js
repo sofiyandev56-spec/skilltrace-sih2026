@@ -50,10 +50,22 @@ async function live(path, { method = 'GET', body } = {}) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
+    // The bearer token is read per request rather than captured once, so a
+    // sign-in or sign-out takes effect on the very next call.
+    const headers = {}
+    if (body) headers['Content-Type'] = 'application/json'
+    let token = null
+    try {
+      token = localStorage.getItem('skilltrace.auth.token')
+    } catch {
+      token = null
+    }
+    if (token) headers.Authorization = `Bearer ${token}`
+
     const res = await fetch(`${API_BASE}${path}`, {
       method,
       signal: controller.signal,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      headers,
       body: body ? JSON.stringify(body) : undefined,
     })
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
