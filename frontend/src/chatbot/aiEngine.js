@@ -713,13 +713,28 @@ You can check your detailed milestone progress anytime directly in the **Client 
 
 function formatClientAssessment(clientData, lang, isHinglish, isMarathiLatin) {
   const rec = clientData.record
-  return `### Your NSQF Assessment Result:
-* **Qualification:** ${rec.course}
-* **Assessment Status:** Certified & Verified
-* **Standard:** National Skills Qualifications Framework (NSQF) Aligned
-* **Evidence Status:** Independently Corroborated
-
-Your assessment confirms competency in the core curriculum requirements. Maintain steady employment to achieve the 3-month verified milestone.`
+  const a = rec.assessment
+  const en = rec.enrolment
+  // Real scores from the assessment record. Previously this told every
+  // trainee they were "Certified & Verified", whatever they had scored.
+  if (!a) {
+    return `### ${translate(lang, 'cbAssessTitle')}\n${translate(lang, 'cbAssessNone')}`
+  }
+  const lines = [
+    `### ${translate(lang, 'cbAssessTitle')}`,
+    `* **${translate(lang, 'cbAssessQualification')}:** ${rec.course}`,
+    `* **${translate(lang, 'cbAssessTechnical')}:** ${a.technical_score ?? '—'} / 100`,
+    `* **${translate(lang, 'cbAssessSoft')}:** ${a.soft_skill_score ?? '—'} / 100`,
+    `* **${translate(lang, 'cbAssessResult')}:** ${a.result ?? '—'} · ${a.skill_level ?? '—'}`,
+    `* **${translate(lang, 'cbAssessCertified')}:** ${a.certified ? translate(lang, 'cbYes') : translate(lang, 'cbNo')}`,
+  ]
+  if (en) {
+    lines.push(
+      `* **${translate(lang, 'cbAssessAttendance')}:** ${en.attendance_pct != null ? `${en.attendance_pct}%` : '—'} · ${en.completion_status ?? '—'}`,
+    )
+  }
+  lines.push('', translate(lang, a.certified ? 'cbAssessNextCertified' : 'cbAssessNextNot'))
+  return lines.join('\n')
 }
 
 function formatPlatformHelp(query, lang, isHinglish, isMarathiLatin) {
