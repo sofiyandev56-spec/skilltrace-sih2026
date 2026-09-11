@@ -482,11 +482,31 @@ def _tier_pct(tiers):
 
 
 def _events_by_trainee(db: Session, ids):
+    """
+    Events per trainee, as plain rows rather than ORM objects.
+
+    Hydrating ~32,000 Event instances took the whole-cohort dashboard to
+    9.7 s cold and 1.1 s warm — past the client's 2.5 s timeout on first
+    load, so the page fell back to the offline store and the badge read
+    "Mock data". Selecting columns gives rows with the same attribute
+    access at a fraction of the cost.
+    """
     out = {}
     if not ids:
         return out
-    for e in db.query(Event).filter(Event.trainee_id.in_(ids)).order_by(Event.date).all():
-        out.setdefault(e.trainee_id, []).append(e)
+    cols = (Event.id, Event.trainee_id, Event.date, Event.what_happened,
+            Event.job_role, Event.employer, Event.salary, Event.source, Event.trust_level)
+    q = db.query(*cols).order_by(Event.date)
+    # Skip the IN-list entirely for the whole cohort; SQLite's parameter cap
+    # is well below 15,000 anyway.
+    if len(ids) < 900:
+        q = q.filter(Event.trainee_id.in_(ids))
+        rows = q.all()
+    else:
+        wanted = set(ids)
+        rows = [r for r in q.all() if r.trainee_id in wanted]
+    for r in rows:
+        out.setdefault(r.trainee_id, []).append(r)
     return out
 
 
@@ -531,7 +551,13 @@ def _meta():
 
 
 def _filtered_trainees(db, cohort=None, course=None, provider=None, district=None, demographic=None):
-    q = db.query(Trainee)
+    # Columns only: the analytics never write, and 13,000 ORM instances cost
+    # more to build than the aggregation they feed.
+    q = db.query(
+        Trainee.id, Trainee.name, Trainee.course, Trainee.district, Trainee.gender,
+        Trainee.age_group, Trainee.category, Trainee.cohort, Trainee.provider_id,
+        Trainee.employer, Trainee.salary,
+    )
     if cohort:
         q = q.filter(Trainee.cohort == cohort)
     if course:
