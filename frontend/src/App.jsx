@@ -21,8 +21,7 @@ import FollowupQueue from './pages/FollowupQueue.jsx'
 import ClientDashboard from './pages/ClientDashboard.jsx'
 import EmployerDashboard from './pages/EmployerDashboard.jsx'
 import MasterPortal from './pages/MasterPortal.jsx'
-import SovereignChatbot from './components/SovereignChatbot.jsx'
-
+import GovAuditLogs from './pages/GovAuditLogs.jsx'
 /** Keeps the browser tab title in step with the page and the language. */
 function useDocumentTitle() {
   const { pathname } = useLocation()
@@ -165,6 +164,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/audit-logs"
+            element={
+              <ProtectedRoute allowedRoles={['government']}>
+                <GovAuditLogs />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -174,7 +181,6 @@ export default function App() {
 
       <GovPolicyModal />
       <AuthModal />
-      <SovereignChatbot />
       </div>
     </ToastProvider>
   )

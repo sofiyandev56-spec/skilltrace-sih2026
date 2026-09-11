@@ -79,7 +79,7 @@ export default function MasterPortal() {
 
   const handleDelete = async (userId, userEmail) => {
     if (userEmail === MASTER_GOV_EMAIL) {
-      alert('Master Sovereign Administrator cannot be deleted.')
+      alert('GOV Administrator cannot be deleted.')
       return
     }
     if (!window.confirm(`Are you sure you want to remove user: ${userEmail}?`)) return
@@ -155,7 +155,7 @@ export default function MasterPortal() {
       <GovNav active="master" />
 
       <main className="content" style={{ maxWidth: 1400, margin: '0 auto', padding: '24px 20px' }}>
-        {/* Sovereign Header Banner */}
+        {/* GOV Header Banner */}
         <div
           style={{
             background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #1e3a8a 100%)',
@@ -173,7 +173,7 @@ export default function MasterPortal() {
         >
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <span style={{ fontSize: '1.8rem' }}>👑</span>
+              <span style={{ fontSize: '1.8rem' }}>🏛️</span>
               <span
                 style={{
                   background: 'rgba(234, 179, 8, 0.2)',
@@ -186,15 +186,15 @@ export default function MasterPortal() {
                   border: '1px solid rgba(234, 179, 8, 0.3)'
                 }}
               >
-                MASTER GOV AUTHORITY PORTAL
+                ADMIN GOV AUTHORITY PORTAL
               </span>
-              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>&bull; MSDE Sovereign Administration</span>
+              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>&bull; MSDE GOV Administration</span>
             </div>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#f8fafc' }}>
               National SkillTrace User Access Controller
             </h1>
             <p style={{ margin: '8px 0 0', color: '#cbd5e1', fontSize: '0.92rem', maxWidth: 780 }}>
-              Master Authority: <strong style={{ color: '#60a5fa' }}>{MASTER_GOV_EMAIL}</strong>. Only verified users can access the Trainee or Employer portals. All public Google logins default to unverified quarantine until approved here.
+              GOV Authority: <strong style={{ color: '#60a5fa' }}>{MASTER_GOV_EMAIL}</strong>. Only verified users can access the Trainee or Employer portals. All public Google logins default to unverified quarantine until approved here.
             </p>
           </div>
 
@@ -386,14 +386,14 @@ export default function MasterPortal() {
                                 fontSize: '0.9rem'
                               }}
                             >
-                              {isMaster ? '👑' : (u.name || u.email || '?')[0].toUpperCase()}
+                              {isMaster ? '🏛️' : (u.name || u.email || '?')[0].toUpperCase()}
                             </div>
                             <div>
                               <div style={{ fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span>{u.name || 'Anonymous User'}</span>
                                 {isMaster && (
                                   <span style={{ fontSize: '0.72rem', background: '#dbeafe', color: '#1d4ed8', padding: '1px 6px', borderRadius: 4, fontWeight: 800 }}>
-                                    MASTER SOVEREIGN
+                                    GOV ADMIN
                                   </span>
                                 )}
                               </div>
@@ -405,7 +405,7 @@ export default function MasterPortal() {
                         <td style={{ padding: '14px 14px' }}>
                           {isMaster ? (
                             <span style={{ fontWeight: 700, color: '#1e3a8a' }}>
-                              🏛️ Sovereign Government
+                              🏛️ GOV Government
                             </span>
                           ) : (
                             <select
@@ -433,7 +433,7 @@ export default function MasterPortal() {
                         <td style={{ padding: '14px 14px' }}>
                           {isMaster ? (
                             <span style={{ color: '#15803d', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              <span>✓</span> Sovereign Verified
+                              <span>✓</span> GOV Verified
                             </span>
                           ) : u.verified ? (
                             <span
@@ -465,13 +465,13 @@ export default function MasterPortal() {
                                 gap: 4
                               }}
                             >
-                              <span>⏳</span> Pending Master Approval
+                              <span>⏳</span> Pending GOV Approval
                             </span>
                           )}
                         </td>
 
                         <td style={{ padding: '14px 14px', color: '#475569' }}>
-                          {u.organization || (u.verified ? (u.role === 'client' ? 'National Skill Registry (MSDE)' : u.company_name || u.designation) : (u.designation || 'Pending Master Verification'))}
+                          {u.organization || (u.verified ? (u.role === 'client' ? 'National Skill Registry (MSDE)' : u.company_name || u.designation) : (u.designation || 'Pending GOV Verification'))}
                         </td>
 
                         <td style={{ padding: '14px 18px', textAlign: 'right' }}>

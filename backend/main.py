@@ -734,6 +734,18 @@ def delete_user_admin(user_id: str, db: Session = Depends(get_db), current_user:
 
     return {"success": True, "message": f"User {user_id} deleted."}
 
+@app.get("/api/admin/audit-logs")
+def get_audit_logs_admin(db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user_optional)):
+    """Fetch recent activity from Supabase to provide an audit trail of data synchronization."""
+    if current_user:
+        is_master = (current_user.email or "").lower() == MASTER_GOV_EMAIL
+        if not is_master and current_user.role != "government":
+            raise HTTPException(status_code=403, detail="Access restricted to Master Sovereign Authority.")
+
+    # Call the new helper from supabase_client
+    logs = sb.sb_get_audit_logs()
+    return logs
+
 # -------------------------------------------------------------------
 # Dashboard Endpoints (With Role-Based Data Restriction)
 # -------------------------------------------------------------------

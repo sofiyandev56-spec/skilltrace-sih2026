@@ -177,3 +177,58 @@ def sb_upsert_event(event: dict):
     except Exception as e:
         logger.warning(f"sb_upsert_event error: {e}")
         return None
+
+
+# ── Audit Log helpers ──────────────────────────────────────────────────
+
+def sb_get_audit_logs() -> list:
+    """Fetch recent activity from checkins, whatsapp_sessions, events, and admin_users to create an audit trail."""
+    sb = get_supabase()
+    if not sb:
+        return []
+    
+    logs = []
+    
+    try:
+        # 1. Fetch checkins
+        checkins_res = sb.table("checkins").select("*").order("created_at", desc=True).limit(20).execute()
+        for r in (checkins_res.data or []):
+            logs.append({
+                "timestamp": r.get("created_at", r.get("date")),
+                "table": "checkins",
+                "action": f"Check-in logged via {r.get('source')}",
+                "actor": r.get("trainee_id"),
+                "details": str(r.get("payload", {}))
+            })
+            
+        # 2. Fetch whatsapp_sessions
+        wa_res = sb.table("whatsapp_sessions").select("*").order("updated_at", desc=True).limit(20).execute()
+        for r in (wa_res.data or []):
+            sd = r.get("session_data", {})
+            status = sd.get("status", "Unknown")
+            logs.append({
+                "timestamp": r.get("updated_at"),
+                "table": "whatsapp_sessions",
+                "action": f"WhatsApp state updated to {status}",
+                "actor": r.get("phone"),
+                "details": str(sd)
+            })
+            
+        # 3. Fetch events
+        events_res = sb.table("events").select("*").order("created_at", desc=True).limit(20).execute()
+        for r in (events_res.data or []):
+            logs.append({
+                "timestamp": r.get("created_at", r.get("date")),
+                "table": "events",
+                "action": f"Event '{r.get('what_happened')}' recorded",
+                "actor": r.get("trainee_id"),
+                "details": f"Employer: {r.get('employer')}, Source: {r.get('source')}"
+            })
+            
+        # Sort combined logs by timestamp descending
+        logs.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+        return logs[:50]
+    except Exception as e:
+        logger.warning(f"sb_get_audit_logs error: {e}")
+        return []
+

@@ -279,49 +279,17 @@ export const api = {
 
   getWhatsAppSessions: () => request('/api/whatsapp/sessions', { timeoutMs: 15000 }, () => ({})),
 
-  /* whatsapp OTP-gated survey flow - strictly real OTP via WhatsApp with resilient fallback */
+  /* whatsapp OTP-gated survey flow - real OTP via WhatsApp only */
   sendWhatsAppOtp: async (body) => {
-    try {
-      const res = await live('/api/whatsapp/send-otp', { method: 'POST', body, timeoutMs: 15000 })
-      if (res && res.otp) {
-        try {
-          sessionStorage.setItem(`skilltrace_otp_${String(body.phone || '').replace(/\D/g, '')}`, res.otp)
-        } catch (e) {}
-      }
-      return res
-    } catch (err) {
-      // Sovereign Offline/Fallback Guard: Never block user with "Failed to fetch"
-      const localPhone = String(body.phone || '').replace(/\D/g, '')
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString()
-      try {
-        sessionStorage.setItem(`skilltrace_otp_${localPhone}`, generatedOtp)
-      } catch (e) {}
-      return {
-        success: true,
-        phone: localPhone,
-        otp: generatedOtp,
-        message: 'OTP sent to WhatsApp'
-      }
-    }
+    // Always hit the real backend — OTP must be generated server-side
+    // Returns whatsapp_delivered=false + otp when WhatsApp API is unavailable (demo fallback)
+    const res = await live('/api/whatsapp/send-otp', { method: 'POST', body, timeoutMs: 15000 })
+    return res
   },
 
   verifyWhatsAppOtp: async (body) => {
-    try {
-      return await live('/api/whatsapp/verify-otp', { method: 'POST', body, timeoutMs: 15000 })
-    } catch (err) {
-      const localPhone = String(body.phone || '').replace(/\D/g, '')
-      const storedOtp = sessionStorage.getItem(`skilltrace_otp_${localPhone}`)
-      if (!storedOtp || body.otp === storedOtp || (body.otp && String(body.otp).trim().length === 6)) {
-        return {
-          success: true,
-          phone: localPhone,
-          otp_verified: true,
-          status: 'WAITING_STATUS',
-          message: 'OTP verified successfully. WhatsApp 3-Month Survey initiated.'
-        }
-      }
-      throw new Error('Invalid OTP. Please check the code received on WhatsApp.')
-    }
+    // Verify against the real backend only — no sessionStorage bypass
+    return await live('/api/whatsapp/verify-otp', { method: 'POST', body, timeoutMs: 15000 })
   },
 
   resetWhatsAppSession: async (phone) => {

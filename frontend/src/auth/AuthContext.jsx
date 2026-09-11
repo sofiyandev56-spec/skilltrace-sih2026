@@ -33,12 +33,12 @@ export const getLocalRoster = () => {
       name: 'Shlok Borad',
       email: MASTER_GOV_EMAIL,
       role: 'government',
-      designation: 'Master Government Officer & Sovereign Administrator',
+      designation: 'Government Officer & GOV Administrator',
       ministry: 'Ministry of Skill Development and Entrepreneurship',
       company_name: null,
       verified: true,
       is_master: true,
-      last_login: 'Active Master Authority'
+      last_login: 'Active GOV Authority'
     }
   ]
   try {
@@ -320,14 +320,14 @@ export function AuthProvider({ children }) {
     const assignedRole = isMaster ? 'government' : (found?.role || roleToUse || 'client')
     const company = assignedRole === 'employer' ? (found?.company_name || 'Tata Advanced Systems Ltd') : null
     const designation = isMaster
-      ? 'Master Government Officer & Sovereign Administrator'
+      ? 'Government Officer & GOV Administrator'
       : isVerified
       ? (assignedRole === 'employer'
           ? `Corporate Representative (${company || 'Enterprise'})`
           : assignedRole === 'client'
           ? 'Verified Trainee (Digital Skill Passport)'
           : 'Accredited Government Officer (MSDE)')
-      : 'Pending Master Verification'
+      : 'Pending GOV Verification'
 
     const userObj = {
       id: found?.id || (assignedRole === 'client' ? `TRN-${cleanEmail.replace(/\D/g, '').slice(-4) || '2026'}` : `GGL-${(sub || '').slice(-6) || Math.floor(1000 + Math.random() * 9000)}`),

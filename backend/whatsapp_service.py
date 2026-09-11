@@ -207,17 +207,12 @@ def send_whatsapp_otp(phone_number: str, trainee_id: str = "", trainee_name: str
     """
     Generates a random 6-digit OTP, saves it to the session,
     and sends the OTP directly to the user's WhatsApp via Whapi.cloud gateway asynchronously.
+    Returns the OTP in the response so the frontend can show a demo panel if WhatsApp delivery fails.
     """
     cleaned = clean_phone(phone_number)
     otp = f"{random.randint(100000, 999999)}"
     
-    otp_text = f"""🔐 *SkillTrace Sovereign Verification*
-
-Your One-Time Password (OTP) is: *{otp}*
-
-Enter this 6-digit code on the portal to authenticate your WhatsApp number for 3-Month Status Surveys.
-
-⚠️ Valid for 10 minutes. Do not share this code."""
+    otp_text = f"\U0001f510 *SkillTrace Sovereign Verification*\n\nYour One-Time Password (OTP) is: *{otp}*\n\nEnter this 6-digit code on the portal to authenticate your WhatsApp number for 3-Month Status Surveys.\n\n\u26a0\ufe0f Valid for 10 minutes. Do not share this code."
 
     sessions = load_sessions()
     now_iso = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -237,19 +232,36 @@ Enter this 6-digit code on the portal to authenticate your WhatsApp number for 3
         "text": otp_text,
         "timestamp": now_iso
     })
-    session["last_send_success"] = True
+    sessions[cleaned] = session
+
+    # Try sending via WhatsApp, capture success flag
+    whatsapp_delivered = False
+    try:
+        response = requests.post(
+            SEND_URL,
+            headers=HEADERS,
+            json={"to": cleaned, "body": otp_text},
+            timeout=8
+        )
+        if response.status_code == 200:
+            whatsapp_delivered = True
+            log_msg(f"[WHATSAPP] OTP sent to {cleaned}")
+        else:
+            log_msg(f"[WHATSAPP WARN] OTP delivery failed ({response.status_code}): {response.text[:200]}")
+    except Exception as e:
+        log_msg(f"[WHATSAPP EXCEPTION]: {repr(e)}")
+
+    session["last_send_success"] = whatsapp_delivered
     sessions[cleaned] = session
     save_sessions(sessions)
-
-    # Dispatch to WhatsApp gateway asynchronously with zero UI blocking
-    threading.Thread(target=send_whatsapp_message, args=(cleaned, otp_text), daemon=True).start()
 
     return {
         "success": True,
         "phone": cleaned,
-        "otp": otp,
-        "message": "OTP sent to WhatsApp",
-        "sent_via_whapi": True
+        "otp": otp,                          # always returned for demo/fallback display
+        "whatsapp_delivered": whatsapp_delivered,
+        "message": "OTP sent to WhatsApp" if whatsapp_delivered else "OTP generated (WhatsApp delivery failed — use code below)",
+        "sent_via_whapi": whatsapp_delivered
     }
 
 def verify_whatsapp_otp(phone_number: str, entered_otp: str) -> Dict[str, Any]:

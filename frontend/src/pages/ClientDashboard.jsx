@@ -256,7 +256,7 @@ export default function ClientDashboard() {
   )
 
   // Automated Background Bank Statement Reconciliation
-  const [bankAutoReconciled, setBankAutoReconciled] = useState(true)
+  const [bankAutoReconciled, setBankAutoReconciled] = useState(false)
 
   const triggerAutoBankReconciliation = (amount = 50000) => {
     setBankAutoReconciled(true)
@@ -275,27 +275,24 @@ export default function ClientDashboard() {
   // Derive phone from user object
   const userPhone = activePhone.replace(/\D/g, '')
 
-  // WhatsApp OTP Survey States
-  const [phoneInput, setPhoneInput] = useState(activePhone ? activePhone.replace(/\D/g, '').slice(-10) : '')
+  const [phoneInput, setPhoneInput] = useState('') // Removed auto-fill
   const [waSession, setWaSession] = useState(null)
   const [otpStep, setOtpStep] = useState('idle') // idle | sending | awaiting_otp | verifying | verified | error
   const [otpInput, setOtpInput] = useState('')
   const [otpError, setOtpError] = useState('')
+  const [demoOtp, setDemoOtp] = useState(null) // shown on screen when WhatsApp delivery fails
   const [pollingWa, setPollingWa] = useState(false)
   const [resettingWa, setResettingWa] = useState(false)
   const [simulatingReply, setSimulatingReply] = useState(false)
   const [lastSyncedTime, setLastSyncedTime] = useState(null)
 
   useEffect(() => {
-    if (activePhone) {
-      const p = activePhone.replace(/\D/g, '')
-      if (p.length >= 10) setPhoneInput(p.slice(-10))
-    }
+    // Disabled auto phone number fill up from google account
   }, [activePhone])
 
-  // Continuous background auto-sync with WhatsApp gateway (polls every 3.5s)
+  // Continuous background auto-sync with WhatsApp gateway (polls every 3.5s) ONLY after OTP verified
   useEffect(() => {
-    if (!phoneInput || phoneInput.length < 10) return
+    if (otpStep !== 'verified' || !phoneInput || phoneInput.length < 10) return
 
     let isMounted = true
     const checkSync = async () => {
@@ -309,10 +306,10 @@ export default function ClientDashboard() {
             }
             return updated
           })
-          if (updated.otp_verified) {
-            setOtpStep((prev) => (prev !== 'verified' ? 'verified' : prev))
-          }
           if (updated.status === 'COMPLETED') {
+            if (updated.outcome !== 'Unemployed' && (updated.salary || updated.revenue) && !bankAutoReconciled) {
+               triggerAutoBankReconciliation(updated.salary || updated.revenue)
+            }
             recordReq.reload()
           }
         }
@@ -321,12 +318,12 @@ export default function ClientDashboard() {
     }
 
     checkSync()
-    const interval = setInterval(checkSync, 3500)
+    const interval = setInterval(checkSync, 1000)
     return () => {
       isMounted = false
       clearInterval(interval)
     }
-  }, [phoneInput])
+  }, [phoneInput, otpStep])
 
   const handleSendOtp = async () => {
     if (!phoneInput || phoneInput.length < 10) {
@@ -338,16 +335,25 @@ export default function ClientDashboard() {
     setOtpStep('sending')
     setOtpError('')
     try {
-      await api.sendWhatsAppOtp({
+      const res = await api.sendWhatsAppOtp({
         phone: phoneInput,
         trainee_id: record?.id || traineeId,
         trainee_name: record?.name || user?.name || 'Trainee',
         email: user?.email || record?.email || ''
       })
+      
+      if (res?.whatsapp_delivered === false) {
+          setOtpStep('error')
+          setOtpError('WhatsApp delivery unavailable. API limit exceeded.')
+          toast.push(hi ? 'OTP भेजने में त्रुटि' : 'OTP send failed', { detail: 'WhatsApp API trial limit exceeded.' })
+          return
+      }
+
       setOtpStep('awaiting_otp')
       toast.push(hi ? 'OTP व्हाट्सएप पर भेजा गया' : 'OTP sent to WhatsApp', {
         detail: hi ? `6-अंकीय OTP +91 ${phoneInput} पर भेजा गया है।` : `A 6-digit OTP was sent to +91 ${phoneInput} via WhatsApp.`
       })
+      
     } catch (err) {
       setOtpStep('error')
       setOtpError(err.message || 'Failed to send OTP')
@@ -371,9 +377,8 @@ export default function ClientDashboard() {
       if (res?.success) {
         setOtpStep('verified')
         setWaSession(res?.session || null)
-        triggerAutoBankReconciliation(50000)
-        toast.push(hi ? 'OTP सत्यापित एवं बैंक स्टेटमेंट स्वतः प्रमाणित ✅' : 'WhatsApp OTP Verified & Bank Reconciled ✅', {
-          detail: hi ? 'व्हाट्सएप सत्यापन व ₹50,000 वेतन का बैंक स्टेटमेंट स्वतः प्रमाणित हुआ।' : 'WhatsApp verification and ₹50,000 salary bank statement reconciled automatically.'
+        toast.push(hi ? 'OTP सत्यापित ✅' : 'WhatsApp OTP Verified ✅', {
+          detail: hi ? 'व्हाट्सएप सत्यापन सफल हुआ। अब सर्वेक्षण जारी है।' : 'WhatsApp verification successful. Survey is now live.'
         })
       } else {
         setOtpStep('awaiting_otp')
@@ -410,34 +415,18 @@ export default function ClientDashboard() {
         })
       }
 
-      // 3. Create persistent check-in event in trainee record & auto-reconcile bank statement
       const salNum = value ? Number(value) : (option === '2' ? 50000 : option === '3' ? 50000 : null)
-      triggerAutoBankReconciliation(salNum || 50000)
-
-      try {
-        const outStatus = option === '1' ? 'not_working' : option === '3' ? 'self_employed' : 'employed'
-        const whatEvt = option === '1' ? 'unemployed' : 'still_working'
-        await api.postCheckin({
-          trainee_id: record?.id || traineeId,
-          source: 'whatsapp_verified_survey',
-          answer: outStatus,
-          what_happened: whatEvt,
-          salary: salNum || 50000,
-          employer: option === '1' ? null : (option === '3' ? 'Tata Advanced Systems Ltd (AI Division)' : (record?.employer || 'Tata Advanced Systems Ltd (AI Division)')),
-          job_role: record?.course || 'AI & Machine Learning',
-          trust_level: 'high'
-        })
-      } catch (checkinErr) {
-        // Silent background sync
-      }
+      
+      // Removed triggerAutoBankReconciliation to prevent auto confirmation
+      // Removed automatic check-in posting to prevent bypassing API security and obscuring roles
 
       if (res) {
         setWaSession(res)
         await recordReq.reload()
-        toast.push(hi ? 'व्हाट्सएप व बैंक सत्यापन स्वतः दर्ज' : 'WhatsApp & Bank Statement Verified', {
+        toast.push(hi ? 'व्हाट्सएप व बैंक सत्यापन स्वतः दर्ज' : 'Status Submitted', {
           detail: hi
-            ? `सत्यापन पूर्ण: ₹50,000 वेतन रिकॉर्ड आरबीआई खाता एग्रीगेटर से स्वतः पुष्टीकृत हुआ।`
-            : `Verification complete: ₹50,000 salary record auto-reconciled with RBI Account Aggregator.`
+            ? `सत्यापन पूर्ण: रिकॉर्ड अद्यतित।`
+            : `Verification step complete.`
         })
       }
     } catch (err) {
@@ -537,7 +526,7 @@ export default function ClientDashboard() {
   const hasWaEvent = record.events?.some((e) => e.source === 'whatsapp_verified_survey')
   const isCompleted = waSession?.status === 'COMPLETED' || Boolean(waSession?.outcome) || hasWaEvent
   const effectiveOutcome = waSession?.outcome || (effectiveBucket === 'not_working' ? 'Unemployed' : effectiveBucket === 'self_employed' ? 'Self-employed' : 'Employed')
-  const effectiveSalary = waSession?.salary || waSession?.revenue || latestPay || 25000
+  const effectiveSalary = effectiveOutcome === 'Unemployed' ? null : (waSession?.salary || waSession?.revenue || latestPay || 25000)
 
   return (
     <div className="client">
@@ -708,19 +697,21 @@ export default function ClientDashboard() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Live Auto-sync indicator */}
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              background: '#dcfce7', border: '1px solid #86efac', borderRadius: '20px',
-              padding: '5px 12px', fontSize: '11px', fontWeight: 600, color: '#15803d'
-            }} title="Continuous real-time synchronization with WhatsApp gateway">
-              <span style={{
-                display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
-                background: '#22c55e', boxShadow: '0 0 6px #22c55e'
-              }} />
-              <span>{hi ? 'ऑटो-सिंक सक्रिय' : 'Auto-sync Active'}</span>
-              <span style={{ color: '#64748b', fontSize: '10px' }}>({lastSyncedTime || 'live'})</span>
-            </div>
+            {/* Live Auto-sync indicator - Only when verified */}
+            {otpStep === 'verified' && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                background: '#dcfce7', border: '1px solid #86efac', borderRadius: '20px',
+                padding: '5px 12px', fontSize: '11px', fontWeight: 600, color: '#15803d'
+              }} title="Continuous real-time synchronization with WhatsApp gateway">
+                <span style={{
+                  display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
+                  background: '#22c55e', boxShadow: '0 0 6px #22c55e'
+                }} />
+                <span>{hi ? 'ऑटो-सिंक सक्रिय' : 'Auto-sync Active'}</span>
+                <span style={{ color: '#64748b', fontSize: '10px' }}>({lastSyncedTime || 'live'})</span>
+              </div>
+            )}
 
             {/* Auto-schedule badge */}
             <div style={{

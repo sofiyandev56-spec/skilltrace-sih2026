@@ -4,13 +4,9 @@
  */
 import { createClient } from '@supabase/supabase-js'
 
-const SUPA_URL =
-  import.meta.env.VITE_SUPABASE_URL ||
-  'https://sykivvztgbwltzkifhqt.supabase.co'
+const SUPA_URL = import.meta.env.VITE_SUPABASE_URL || ''
 
-const SUPA_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5a2l2dnp0Z2J3bHR6a2lmaHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNTI1NzUsImV4cCI6MjEwNDYyODU3NX0.rZs9Xj1w0tnX37rya4i2WBVxmkl_7D1CZrHQCZxZx2Q'
+const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
 export const supabase = createClient(SUPA_URL, SUPA_KEY, {
   auth: {

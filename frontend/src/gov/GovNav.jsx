@@ -18,11 +18,17 @@ export default function GovNav({ counts = { disputes: 0, followup: 0 }, onResetD
     },
     ...(isMasterAdmin ? [{
       path: '/master-portal',
-      labelEn: '👑 Master Access Portal',
-      labelHi: '👑 मास्टर एक्सेस पोर्टल',
+      labelEn: '🏛️ Admin Portal',
+      labelHi: '🏛️ एडमिन पोर्टल',
       badge: 'ROOT',
       badgeClass: 'nav-badge--warning',
     }] : []),
+    {
+      path: '/audit-logs',
+      labelEn: 'Audit Logs',
+      labelHi: 'ऑडिट लॉग्स',
+      badge: null,
+    },
     {
       path: '/disputes',
       labelEn: 'Disputed Records',
