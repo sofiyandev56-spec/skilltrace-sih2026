@@ -82,7 +82,9 @@ export async function login(identifier, password) {
     // would let the form be used to discover which accounts exist.
     return { ok: false, reason: res.status === 0 ? 'offline' : 'invalid' }
   }
-  setToken(res.data.access_token)
+  // Deliberately not persisted here. A caller may still reject this session —
+  // the officer form refuses a valid trainee — and storing the token first
+  // would have destroyed whatever session was already signed in.
   return { ok: true, token: res.data.access_token, session: toSession(res.data) }
 }
 
@@ -98,7 +100,6 @@ export async function loginGoogle({ credential, email, name, preferredRole }) {
     role: preferredRole ?? null,
   })
   if (!res.ok) return { ok: false, reason: 'invalid', detail: res.detail }
-  setToken(res.data.access_token)
   return { ok: true, token: res.data.access_token, session: toSession(res.data) }
 }
 
@@ -130,6 +131,10 @@ export async function verifyOtp(phone, otp, traineeId = null) {
     trainee_id: traineeId,
   })
   if (!res.ok) return { ok: false, detail: res.detail }
-  if (res.data?.access_token) setToken(res.data.access_token)
-  return { ok: true, data: res.data, session: res.data?.user ? toSession(res.data) : null }
+  return {
+    ok: true,
+    data: res.data,
+    token: res.data?.access_token ?? null,
+    session: res.data?.user ? toSession(res.data) : null,
+  }
 }

@@ -82,7 +82,8 @@ export function AuthProvider({ children }) {
   const homeFor = (r) =>
     r === 'government' ? '/ministry' : r === 'employer' ? '/employer' : '/client'
 
-  const adopt = (next, { navigateHome = true } = {}) => {
+  const adopt = (next, token, { navigateHome = true } = {}) => {
+    if (token) backendAuth.setToken(token)
     setSession(next)
     setModalState((prev) => ({ ...prev, isOpen: false, loading: false, error: '' }))
     if (navigateHome && next) navigate(homeFor(next.role), { replace: true })
@@ -99,10 +100,10 @@ export function AuthProvider({ children }) {
     const res = await backendAuth.login(identifier, password)
     if (!res.ok) return res
     if (res.session?.role !== 'government') {
-      backendAuth.clearToken()
+      // Nothing was stored, so whoever was already signed in stays signed in.
       return { ok: false, reason: 'invalid' }
     }
-    adopt(res.session, { navigateHome: false })
+    adopt(res.session, res.token, { navigateHome: false })
     return { ok: true, officer: res.session }
   }
 
@@ -113,7 +114,7 @@ export function AuthProvider({ children }) {
       setModalState((prev) => ({ ...prev, loading: false, error: 'invalid' }))
       return res
     }
-    adopt(res.session)
+    adopt(res.session, res.token)
     return res
   }
 
@@ -179,7 +180,7 @@ export function AuthProvider({ children }) {
               resolve(out)
               return
             }
-            adopt(out.session)
+            adopt(out.session, out.token)
             resolve(out)
           } catch {
             setModalState((prev) => ({ ...prev, loading: false, error: 'google_unavailable' }))
@@ -217,7 +218,7 @@ export function AuthProvider({ children }) {
       return false
     }
     if (res.session) {
-      adopt(res.session)
+      adopt(res.session, res.token)
       return true
     }
     // Verified, but the number is not on a record yet.
@@ -241,7 +242,7 @@ export function AuthProvider({ children }) {
       setModalState((prev) => ({ ...prev, loading: false, error: 'profile_failed' }))
       return false
     }
-    adopt(res.session)
+    adopt(res.session, res.token)
     return true
   }
 

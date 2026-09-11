@@ -3526,6 +3526,7 @@ html[data-contrast="high"] .story__gap { background: #fff; }
   color: var(--navy-800);
 }
 .officer__id {
+  white-space: nowrap;
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--text-muted);

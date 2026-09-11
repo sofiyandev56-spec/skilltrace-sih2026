@@ -25,7 +25,18 @@ export default function OfficerHeader({ officer, filters, onFilterChange }) {
   const { t } = useGov()
   if (!officer) return null
 
-  const districtScoped = Boolean(officer.district)
+  // The backend describes reach as a permission rather than a scope string,
+  // and identifies officers by `id`. Both spellings are accepted so the
+  // component works against the API and against a seeded officer record.
+  const officerId = officer.officer_id ?? officer.id
+  const phone = officer.phone_no ?? officer.phone
+  const nationwide =
+    officer.permissions?.can_view_all_districts ?? officer.scope !== 'district'
+  const scope = officer.scope ?? (nationwide ? 'national' : 'district')
+
+  // Only an officer actually posted to a district can scope the dashboard to
+  // one; a national officer has nothing to toggle between.
+  const districtScoped = Boolean(officer.district) && !nationwide
   const onOwnDistrict = filters?.district === officer.district
 
   const toggleScope = (toOwnDistrict) => {
@@ -49,7 +60,7 @@ export default function OfficerHeader({ officer, filters, onFilterChange }) {
             width="34"
             height="44"
           />
-          <span className="officer__badge">{t(SCOPE_KEY[officer.scope] || SCOPE_KEY.district)}</span>
+          <span className="officer__badge">{t(SCOPE_KEY[scope] || SCOPE_KEY.district)}</span>
         </div>
 
         <div className="officer__identity">
@@ -63,7 +74,7 @@ export default function OfficerHeader({ officer, filters, onFilterChange }) {
 
           <h2 className="officer__name" id="officer-name">
             {officer.name}
-            <span className="officer__id mono">{officer.officer_id}</span>
+            {officerId ? <span className="officer__id mono">{officerId}</span> : null}
           </h2>
 
           <p className="officer__meta">
@@ -77,12 +88,12 @@ export default function OfficerHeader({ officer, filters, onFilterChange }) {
                 {officer.division}
               </>
             ) : null}
-            {officer.phone_no ? (
+            {phone ? (
               <>
                 <span className="officer__sep" aria-hidden="true">
                   |
                 </span>
-                <span className="mono">{formatPhone(officer.phone_no)}</span>
+                <span className="mono">{formatPhone(phone)}</span>
               </>
             ) : null}
           </p>
@@ -114,7 +125,7 @@ export default function OfficerHeader({ officer, filters, onFilterChange }) {
           ) : (
             <div className="officer__pill">
               <span className="officer__pill-title">
-                {t(officer.scope === 'state' ? 'ohStatewide' : 'ohNationwide')}
+                {t(scope === 'state' ? 'ohStatewide' : 'ohNationwide')}
               </span>
               <span className="officer__pill-sub">{t('ohConsolidated')}</span>
             </div>
