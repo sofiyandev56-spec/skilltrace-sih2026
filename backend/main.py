@@ -888,6 +888,35 @@ def get_dashboard(
     total_consents = db.query(Consent).count()
     granted_consents = db.query(Consent).filter(Consent.granted == True).count()
 
+    # The funnel the dashboard draws. Each stage is a share of everyone
+    # certified, not of the stage before it, so the largest fall is the place
+    # the programme is actually losing people. "Contacted" counts only people
+    # who answered for themselves — an employer or bank signal is evidence
+    # about someone, not contact with them.
+    scope_ids = [t.id for t in trainees]
+    all_events = db.query(Event).filter(Event.trainee_id.in_(scope_ids)).all() if scope_ids else []
+    contacted = len({
+        e.trainee_id for e in all_events if e.source in ("trainee", "field_officer", "whatsapp")
+    })
+    placed_ids = {e.trainee_id for e in all_events if e.what_happened == "placed"}
+    retained_ids = {e.trainee_id for e in all_events if e.what_happened == "still_working"}
+    course_by_id = {t.id: t.course for t in trainees}
+    role_matched = len({
+        e.trainee_id for e in all_events
+        if e.trainee_id in retained_ids and e.job_role and e.job_role == course_by_id.get(e.trainee_id)
+    })
+
+    def _pct(n):
+        return round(n / total * 1000) / 10 if total else 0
+
+    funnel = [
+        {"stage": "Certified", "count": total, "note": "Completed training and assessed", "pct": 100 if total else 0},
+        {"stage": "Contacted", "count": contacted, "note": "Responded to at least one check-in", "pct": _pct(contacted)},
+        {"stage": "Employed", "count": len(placed_ids), "note": "Reported a placement", "pct": _pct(len(placed_ids))},
+        {"stage": "Retained 3 months", "count": len(retained_ids), "note": "Same employer 3+ months on", "pct": _pct(len(retained_ids))},
+        {"stage": "Role-matched", "count": role_matched, "note": "Working in the trained occupation", "pct": _pct(role_matched)},
+    ]
+
     return {
         "as_of": "2026-09-10",
         "filters_applied": {"cohort": cohort, "course": course, "provider": provider, "district": district},
@@ -898,6 +927,8 @@ def get_dashboard(
         "retention": retention_res,
         "wage_progression": wage_progression,
         "wage_evidence": {"high": 60, "medium": 30, "low": 10, "stale": 0, "total": total},
+        "funnel": funnel,
+        "event_count": len(all_events),
         "cohorts_present": ["2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4"],
         "evidence_totals": {
             "high": 55, "medium": 32, "low": 13, "stale": 0, "total": total
@@ -961,62 +992,99 @@ def get_provider_detail(provider_id: str, db: Session = Depends(get_db)):
 @app.get("/attention")
 def get_attention(db: Session = Depends(get_db)):
     """
-    Ranked findings an officer can act on.
+    Ranked findings an officer can act on, per training centre.
 
     Computed from the same rows the dashboard counts, so the panel and the
     headline can never disagree — which they did while this was served from
-    the browser's own seed data.
+    the browser's own seed data. The shape matches what the panel reads:
+    a headline, the unit it concerns, and a sentence saying why.
     """
+    providers = {p.id: p for p in db.query(Provider).all()}
     trainees = db.query(Trainee).all()
     events = db.query(Event).all()
     disputes = db.query(Dispute).all()
 
-    retained = {e.trainee_id for e in events if e.what_happened == "still_working"}
     placed = {e.trainee_id for e in events if e.what_happened == "placed"}
-    self_reported = {e.trainee_id for e in events if e.trust_level == "low"}
+    retained = {e.trainee_id for e in events if e.what_happened == "still_working"}
+    role_by_trainee = {
+        e.trainee_id: e.job_role
+        for e in events
+        if e.what_happened in ("placed", "still_working") and e.job_role
+    }
+
+    by_provider: Dict[str, List[Trainee]] = {}
+    for t in trainees:
+        by_provider.setdefault(t.provider_id, []).append(t)
 
     findings: List[Dict[str, Any]] = []
 
-    unproven = placed - retained
-    if unproven:
+    for pid, group in by_provider.items():
+        provider = providers.get(pid)
+        if not provider or not group:
+            continue
+        total = len(group)
+        p_placed = sum(1 for t in group if t.id in placed)
+        p_retained = sum(1 for t in group if t.id in retained)
+        on_role = sum(1 for t in group if role_by_trainee.get(t.id) == t.course)
+
+        placed_pct = round(p_placed / total * 100)
+        role_pct = round(on_role / total * 100)
+        proof_gap = placed_pct - round(p_retained / total * 100)
+
+        if placed_pct >= 50 and role_pct + 20 <= placed_pct:
+            findings.append({
+                "id": f"role-{pid}",
+                "kind": "role_mismatch",
+                "headline": "High placement, low role relevance",
+                "unit": provider.name,
+                "unit_id": pid,
+                "district": provider.district,
+                "detail": (
+                    f"{placed_pct}% of this centre's trainees report a placement, but only "
+                    f"{role_pct}% are working in the occupation the course trains for."
+                ),
+                "action": "Review course-to-employer alignment",
+                "weight": placed_pct - role_pct,
+            })
+
+        if proof_gap >= 30:
+            findings.append({
+                "id": f"unproven-{pid}",
+                "kind": "unverified",
+                "headline": "Placements not yet proven at three months",
+                "unit": provider.name,
+                "unit_id": pid,
+                "district": provider.district,
+                "detail": (
+                    f"{proof_gap} percentage points of this centre's reported placements "
+                    "have no confirmation that the person was still there three months on."
+                ),
+                "action": "Send for field verification",
+                "weight": proof_gap,
+            })
+
+    open_disputes = [d for d in disputes if d.status != "resolved"]
+    if open_disputes:
         findings.append({
-            "kind": "unverified_outcomes",
-            "count": len(unproven),
-            "severity": "high" if len(unproven) > len(placed) / 2 else "medium",
+            "id": "disputes-open",
+            "kind": "disputes",
+            "headline": "Disputed records awaiting a decision",
+            "unit": f"{len(open_disputes)} record" + ("s" if len(open_disputes) != 1 else ""),
+            "unit_id": None,
+            "district": None,
+            "detail": (
+                "An employer and a trainee describe the same job differently. These are "
+                "excluded from every outcome figure until a reviewer decides."
+            ),
+            "action": "Open disputed records",
+            "weight": 100 + len(open_disputes),
         })
 
-    if self_reported:
-        findings.append({
-            "kind": "self_reported",
-            "count": len(self_reported),
-            "severity": "medium",
-        })
-
-    unassigned = [d for d in disputes if d.status != "resolved"]
-    if unassigned:
-        findings.append({
-            "kind": "open_disputes",
-            "count": len(unassigned),
-            "severity": "high",
-        })
-
-    mismatched = [
-        e for e in events
-        if e.what_happened in ("placed", "still_working")
-        and e.job_role
-        and next((t.course for t in trainees if t.id == e.trainee_id), None)
-        not in (None, e.job_role)
-    ]
-    if mismatched:
-        findings.append({
-            "kind": "role_mismatch",
-            "count": len({e.trainee_id for e in mismatched}),
-            "severity": "medium",
-        })
-
-    order = {"high": 0, "medium": 1, "low": 2}
-    findings.sort(key=lambda f: (order.get(f["severity"], 3), -f["count"]))
-    return findings
+    findings.sort(key=lambda f: -f["weight"])
+    for f in findings:
+        f.pop("weight", None)
+    # The panel reads `findings` off the response object, not a bare array.
+    return {"findings": findings}
 
 
 @app.get("/audit")
