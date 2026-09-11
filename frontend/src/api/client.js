@@ -167,8 +167,52 @@ export const api = {
   /* check-in */
   postCheckin: (body) => request('/checkin', { method: 'POST', body }, () => mock.postCheckin(body)),
 
-  /* follow-up queue */
-  getFollowupQueue: () => request('/followup-queue', {}, () => mock.getFollowupQueue()),
+  /* trainee requests */
+  submitRequest: (body) => request('/requests', { method: 'POST', body }, () => mock.submitRequest(body)),
+
+  /* skill record PDF download */
+  downloadSkillRecord: async (traineeId) => {
+    try {
+      const headers = {}
+      let token = null
+      try {
+        token = localStorage.getItem('skilltrace.auth.token')
+      } catch {
+        token = null
+      }
+      if (token) headers.Authorization = `Bearer ${token}`
+
+      const res = await fetch(`${API_BASE}/trainees/${traineeId}/skill-record`, {
+        headers,
+      })
+      if (res.status === 404) {
+        return { ok: false, notFound: true, message: 'Skill record is not available yet.' }
+      }
+      if (!res.ok) {
+        return { ok: false, message: 'Unable to generate your skill record. Please try again.' }
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `SkillRecord-${traineeId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      return { ok: true }
+    } catch (err) {
+      console.error('Error downloading skill record:', err)
+      return { ok: false, message: 'Unable to generate your skill record. Please try again.' }
+    }
+  },
+
+  getFollowupQueue: (params) => {
+    const q = new URLSearchParams()
+    if (params?.district) q.set('district', params.district)
+    const qs = q.toString() ? `?${q.toString()}` : ''
+    return request(`/followup-queue${qs}`, {}, () => mock.getFollowupQueue(params))
+  },
 
   // Employer confirmation. There is no mock fallback: an employer's own
   // roster and the milestone they confirm are backend records, and inventing

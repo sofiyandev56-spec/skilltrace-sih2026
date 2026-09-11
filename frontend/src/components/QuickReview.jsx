@@ -48,7 +48,7 @@ export default function QuickReview({ traineeId, courseName }) {
         <div>
           <h3 id="review-done-title">{t('trainingReviewCompleted')}</h3>
           <p className="muted small">
-            {t('thankYouFeedback', longDate(state.data.review?.submitted_at))}
+            {t('thankYouFeedback', longDate(state.data.review?.submitted_at || new Date().toISOString()))}
           </p>
         </div>
       </section>
@@ -78,11 +78,17 @@ export default function QuickReview({ traineeId, courseName }) {
   const progress = Math.round(((onComment ? TOTAL : step) / TOTAL) * 100)
 
   const submit = async () => {
-    setSubmitting(true)
-    await api.submitReview({ trainee_id: traineeId, answers, comment: comment.trim() || null })
-    setSubmitting(false)
-    setJustDone(true)
-    toast.push(t('reviewSubmitted'), { detail: t('reviewSubmittedDetail') })
+    try {
+      setSubmitting(true)
+      await api.submitReview({ trainee_id: traineeId, answers, comment: comment.trim() || null })
+      setSubmitting(false)
+      setJustDone(true)
+      toast.push(t('reviewSubmitted'), { detail: t('reviewSubmittedDetail') })
+    } catch (err) {
+      console.error('Failed to submit review:', err)
+      setSubmitting(false)
+      toast.push(t('reviewSubmitError') || 'We could not submit your review. Please try again.', { tone: 'error' })
+    }
   }
 
   const promptText = question

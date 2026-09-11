@@ -106,6 +106,10 @@ class Review(Base):
     skill_confidence = Column(Float, default=3.0)
     would_recommend = Column(Float, default=3.0)
     feedback = Column(Text, nullable=True)
+    submitted_at = Column(String, nullable=True)
+    district = Column(String, nullable=True)
+    provider_id = Column(String, nullable=True)
+    course = Column(String, nullable=True)
 
 # -------------------------------------------------------------
 # SYNTHETIC SANDBOX BANK VERIFICATION MODELS (DEMO ONLY)
@@ -211,3 +215,24 @@ class FollowupContact(Base):
     training_relevance = Column(Integer, nullable=True)   # 1-5
     skill_gap_identified = Column(String, nullable=True)
     reason_for_attrition = Column(String, nullable=True)
+
+
+class ClientRequest(Base):
+    __tablename__ = "client_requests"
+
+    id = Column(String, primary_key=True, index=True)
+    trainee_id = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    course = Column(String, nullable=True)
+    district = Column(String, nullable=True)
+    provider_id = Column(String, nullable=True)
+    cohort = Column(String, nullable=True)
+    request_type = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    channel = Column(String, default="Trainee Portal Request")
+    created_at = Column(String, nullable=True)
+    assigned_to = Column(String, nullable=True)
+    assigned_at = Column(String, nullable=True)
+    status = Column(String, default="pending")
+

@@ -22,7 +22,7 @@ from sqlalchemy import func, or_, and_
 from .database import engine, get_db, Base, SessionLocal
 from .models import (
     User, Trainee, Event, Provider, Dispute, Consent, Checkin, Review,
-    Assessment, Enrolment, Employer, FollowupContact,
+    Assessment, Enrolment, Employer, FollowupContact, ClientRequest,
     SandboxUser, SandboxBank, SandboxAuditLog
 )
 from .auth import (
@@ -37,6 +37,7 @@ from .sandbox_service import (
     INITIAL_SANDBOX_USERS,
     INITIAL_SANDBOX_BANKS
 )
+from .pdf_service import generate_skill_record_pdf
 from .whatsapp_service import (
     start_whatsapp_survey,
     send_whatsapp_otp,
@@ -473,6 +474,13 @@ _REVIEW_QUESTIONS = [
     ("confidence", "skill_confidence", ["very_confident", "confident", "somewhat_confident", "not_confident"]),
     ("recommend", "would_recommend", ["definitely", "probably", "maybe", "no"]),
 ]
+_REVIEW_META = {
+    "overall_quality": {"labelKey": "rvShortQuality", "promptKey": "rvQ1"},
+    "job_usefulness": {"labelKey": "rvShortUseful", "promptKey": "rvQ2"},
+    "trainer_rating": {"labelKey": "rvShortTrainer", "promptKey": "rvQ3"},
+    "confidence": {"labelKey": "rvShortConfidence", "promptKey": "rvQ4"},
+    "recommend": {"labelKey": "rvShortRecommend", "promptKey": "rvQ5"},
+}
 
 
 def _days_between(a: str, b: str) -> int:
@@ -1923,6 +1931,40 @@ def get_trainee(
     }
 
 
+@app.get("/trainees/{trainee_id}/skill-record")
+def download_skill_record(
+    trainee_id: str,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    """
+    Generates and returns an official, tamper-evident NSQF Post-Training Skill Record
+    and Outcome Credential PDF for the requested trainee.
+    """
+    t = db.query(Trainee).filter(Trainee.id == trainee_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Skill record is not available yet.")
+
+    # Access enforcement for trainees
+    if current_user and current_user.role == "client" and current_user.id != t.id:
+        raise HTTPException(status_code=403, detail="DPDPA Restriction: You can only download your own credential.")
+
+    provider = db.query(Provider).filter(Provider.id == t.provider_id).first()
+    events = db.query(Event).filter(Event.trainee_id == t.id).order_by(Event.date.asc()).all()
+
+    pdf_bytes = generate_skill_record_pdf(t, provider=provider, events=events)
+    filename = f"SkillRecord-{t.id}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        }
+    )
+
+
 @app.get("/employers")
 def list_employers(
     district: Optional[str] = None,
@@ -2224,8 +2266,11 @@ def get_review_insights(
             if b:
                 counts[b] += 1
         mean = sum(values) / len(values) if values else None
+        meta = _REVIEW_META.get(qid, {"labelKey": qid, "promptKey": qid})
         questions.append({
             "id": qid,
+            "labelKey": meta["labelKey"],
+            "promptKey": meta["promptKey"],
             "responses": len(values),
             "out_of_five": round(mean / 4 * 5, 1) if mean is not None else None,
             "distribution": [
@@ -2269,16 +2314,26 @@ def get_review_insights(
 def get_review(trainee_id: str, db: Session = Depends(get_db)):
     r = db.query(Review).filter(Review.trainee_id == trainee_id).first()
     if not r:
-        return None
+        return {"trainee_id": trainee_id, "completed": False, "review": None}
     return {
         "id": r.id,
         "trainee_id": r.trainee_id,
-        "overall_quality": r.overall_quality,
-        "job_usefulness": r.job_usefulness,
-        "trainer_score": r.trainer_score,
-        "skill_confidence": r.skill_confidence,
-        "would_recommend": r.would_recommend,
-        "feedback": r.feedback
+        "completed": True,
+        "review": {
+            "id": r.id,
+            "trainee_id": r.trainee_id,
+            "overall_quality": r.overall_quality,
+            "job_usefulness": r.job_usefulness,
+            "trainer_score": r.trainer_score,
+            "skill_confidence": r.skill_confidence,
+            "would_recommend": r.would_recommend,
+            "feedback": r.feedback,
+            "comment": r.feedback,
+            "submitted_at": r.submitted_at or "2026-09-11",
+            "district": r.district,
+            "provider_id": r.provider_id,
+            "course": r.course,
+        }
     }
 
 @app.post("/reviews")
@@ -2293,14 +2348,21 @@ def submit_review(
     if not tid:
         raise HTTPException(status_code=400, detail="trainee_id is required")
 
+    trainee = db.query(Trainee).filter(Trainee.id == tid).first()
+
     r = db.query(Review).filter(Review.trainee_id == tid).first()
     if not r:
         r = Review(id=f"REV-{datetime.utcnow().strftime('%M%S%f')[:8]}", trainee_id=tid)
         db.add(r)
 
-    # The Quick Review form sends option values under `answers`; this handler
-    # read top-level floats that were never present, so every review saved the
-    # 4.0 default and the trainee's actual answers were dropped on the floor.
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    r.submitted_at = today_str
+    if trainee:
+        r.district = trainee.district
+        r.provider_id = trainee.provider_id
+        r.course = trainee.course
+
+    # The Quick Review form sends option values under `answers`
     answers = body.get("answers") or {}
 
     def score(question, fallback_key=None):
@@ -2321,9 +2383,27 @@ def submit_review(
         val = score(q, col)
         if val is not None:
             setattr(r, col, val)
-    r.feedback = body.get("feedback") or answers.get("feedback") or r.feedback
+
+    user_feedback = body.get("feedback") or body.get("comment") or answers.get("feedback") or answers.get("comment")
+    if user_feedback:
+        r.feedback = user_feedback
+
     db.commit()
-    return {"status": "success", "review_id": r.id}
+    return {
+        "ok": True,
+        "status": "success",
+        "review_id": r.id,
+        "review": {
+            "id": r.id,
+            "trainee_id": r.trainee_id,
+            "submitted_at": r.submitted_at,
+            "district": r.district,
+            "course": r.course,
+            "provider_id": r.provider_id,
+            "overall_quality": r.overall_quality,
+            "feedback": r.feedback,
+        }
+    }
 
 @app.get("/consent")
 def list_consents(
@@ -2413,14 +2493,21 @@ def post_checkin(body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)
         id=f"CHK-{datetime.utcnow().strftime('%M%S%f')[:8]}",
         trainee_id=tid,
         date=today_str,
-        source=body.get("source", "whatsapp"),
+        source=body.get("source", "trainee"),
         payload=str(body)
     )
     db.add(chk)
 
-    what_happened = body.get("what_happened", "still_working")
+    what_by_answer = {
+        "employed": "still_working",
+        "self_employed": "self_employed",
+        "apprentice": "apprentice",
+        "not_working": "not_working",
+    }
+    answer = body.get("answer")
+    what_happened = what_by_answer.get(answer) or body.get("what_happened", "still_working")
     salary_val = body.get("salary", 14000)
-    source_val = body.get("source", "whatsapp")
+    source_val = body.get("source", "trainee")
 
     # Record event
     new_evt = Event(
@@ -2428,8 +2515,8 @@ def post_checkin(body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)
         trainee_id=tid,
         date=today_str,
         what_happened=what_happened,
-        job_role=body.get("job_role", "Healthcare Assistant"),
-        employer=body.get("employer", "Sanjeevani Hospital"),
+        job_role=body.get("job_role", "Solar Technician"),
+        employer=body.get("employer", "GreenVolt Solar Solutions"),
         salary=salary_val,
         source=source_val,
         trust_level=body.get("trust_level", "high" if source_val in ["whatsapp", "whatsapp_verified_survey"] else "medium")
@@ -2465,12 +2552,26 @@ def post_checkin(body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)
         daemon=True
     ).start()
 
-    return {"status": "checkin_recorded", "id": chk.id, "event_id": new_evt.id}
+    return {
+        "ok": True,
+        "status": "checkin_recorded",
+        "id": chk.id,
+        "event_id": new_evt.id,
+        "event": {
+            "id": new_evt.id,
+            "what_happened": new_evt.what_happened,
+            "date": new_evt.date,
+            "trust_level": new_evt.trust_level,
+            "employer": new_evt.employer,
+        },
+        "trainee": {
+            "id": t.id if t else tid,
+            "name": t.name if t else "Trainee",
+        }
+    }
 
 # The follow-up queue from the national dataset — trainees unreachable after
-# repeated attempts. Held in memory: it is a work list that officers assign
-# from, not a ledger, and the two literal rows this used to return did not
-# even use the field names the page reads.
+# repeated attempts. Held in memory and augmented with persistent client requests.
 _FOLLOWUP_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "..", "frontend", "src", "api", "mock", "data", "organized_data.json",
@@ -2486,6 +2587,31 @@ def _load_followup_queue() -> List[Dict[str, Any]]:
     for r in rows:
         r.setdefault("assigned_to", None)
         r.setdefault("assigned_at", None)
+
+    # Prepend persisted client requests from database
+    try:
+        with SessionLocal() as db:
+            client_reqs = db.query(ClientRequest).order_by(ClientRequest.created_at.desc()).all()
+            for cr in reversed(client_reqs):
+                rows.insert(0, {
+                    "trainee_id": cr.trainee_id,
+                    "name": cr.name or "Trainee",
+                    "phone": cr.phone or "+91 98000 00000",
+                    "course": cr.course or "NSQF Course",
+                    "district": cr.district or "Thane",
+                    "provider_id": cr.provider_id or "PRV-001",
+                    "cohort": cr.cohort or "2025-Q3",
+                    "attempts": 0,
+                    "last_contact_date": cr.created_at or datetime.utcnow().strftime("%Y-%m-%d"),
+                    "channel": f"Trainee Request: {cr.request_type or 'General Assistance'}",
+                    "assigned_to": cr.assigned_to,
+                    "assigned_at": cr.assigned_at,
+                    "request_id": cr.id,
+                    "description": cr.description,
+                })
+    except Exception as e:
+        logger.warning(f"Could not load client_requests from db: {e}")
+
     return rows
 
 
@@ -2499,17 +2625,101 @@ def get_followup_queue(district: Optional[str] = None):
     return _followup_queue
 
 
+class CreateRequestPayload(BaseModel):
+    trainee_id: str
+    request_type: Optional[str] = "Field Officer Assistance"
+    assistance_type: Optional[str] = None
+    description: Optional[str] = None
+    details: Optional[str] = None
+    channel: Optional[str] = "Trainee Portal Request"
+
+
+@app.post("/requests")
+def submit_trainee_request(
+    payload: CreateRequestPayload,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    tid = payload.trainee_id
+    if not tid and current_user:
+        tid = current_user.id
+    if not tid:
+        raise HTTPException(status_code=400, detail="trainee_id is required")
+
+    trainee = db.query(Trainee).filter(Trainee.id == tid).first()
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+    req_type = payload.assistance_type or payload.request_type or "Field Officer Assistance"
+    req_desc = payload.details or payload.description
+
+    req_id = f"REQ-{datetime.utcnow().strftime('%M%S%f')[:8]}"
+    cr = ClientRequest(
+        id=req_id,
+        trainee_id=tid,
+        name=trainee.name if trainee else (current_user.name if current_user else "Trainee"),
+        phone=trainee.phone if trainee else "+91 98000 00000",
+        course=trainee.course if trainee else "NSQF Course",
+        district=trainee.district if trainee else "Thane",
+        provider_id=trainee.provider_id if trainee else "PRV-001",
+        cohort=trainee.cohort if trainee else "2025-Q3",
+        request_type=req_type,
+        description=req_desc,
+        channel=payload.channel,
+        created_at=today_str,
+        status="pending"
+    )
+    db.add(cr)
+    db.commit()
+
+    # Prepend to active queue so it is immediately visible to government officers
+    queue_item = {
+        "trainee_id": cr.trainee_id,
+        "name": cr.name,
+        "phone": cr.phone,
+        "course": cr.course,
+        "district": cr.district,
+        "cohort": cr.cohort,
+        "attempts": 0,
+        "last_contact_date": cr.created_at,
+        "channel": f"Trainee Request: {cr.request_type}",
+        "assigned_to": None,
+        "assigned_at": None,
+        "request_id": cr.id,
+        "description": cr.description,
+    }
+    _followup_queue.insert(0, queue_item)
+
+    return {"ok": True, "status": "success", "request_id": cr.id, "request": queue_item}
+
+
 class AssignFollowupRequest(BaseModel):
     officer: Optional[str] = None
+    officer_name: Optional[str] = None
 
 
 @app.post("/followup-queue/{trainee_id}/assign")
-def assign_followup(trainee_id: str, payload: AssignFollowupRequest):
+def assign_followup(trainee_id: str, payload: AssignFollowupRequest, db: Session = Depends(get_db)):
+    officer_target = payload.officer or payload.officer_name
+    assigned_date = datetime.utcnow().strftime("%Y-%m-%d") if officer_target else None
+    matched = False
     for r in _followup_queue:
         if r.get("trainee_id") == trainee_id:
-            r["assigned_to"] = payload.officer
-            r["assigned_at"] = datetime.utcnow().strftime("%Y-%m-%d") if payload.officer else None
-            return r
+            r["assigned_to"] = officer_target
+            r["assigned_at"] = assigned_date
+            matched = True
+            break
+
+    # Persist in DB if it's a client_request
+    cr = db.query(ClientRequest).filter(ClientRequest.trainee_id == trainee_id).first()
+    if cr:
+        cr.assigned_to = officer_target
+        cr.assigned_at = assigned_date
+        cr.status = "assigned" if payload.officer else "pending"
+        db.commit()
+
+    if matched:
+        return {"status": "assigned", "trainee_id": trainee_id, "officer": payload.officer, "assigned_at": assigned_date}
+
     raise HTTPException(status_code=404, detail="Trainee is not in the follow-up queue.")
 
 @app.post("/api/whatsapp/send-survey")

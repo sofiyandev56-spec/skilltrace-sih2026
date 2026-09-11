@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useApi } from '../lib/useApi.js'
@@ -182,6 +182,35 @@ export default function ClientDashboard() {
 
   const recordReq = useApi(() => api.getTrainee(traineeId), [traineeId])
   const reviewReq = useApi(() => api.getReview(traineeId), [traineeId])
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadSkillRecord = async () => {
+    if (downloading) return
+    setDownloading(true)
+    try {
+      const res = await api.downloadSkillRecord(traineeId)
+      setDownloading(false)
+      if (res.ok) {
+        toast.push(t('credentialPrepared') || 'Skill record downloaded', {
+          detail: t('credentialPreparedDetail') || 'Verified NSQF post-training credential saved.',
+        })
+      } else if (res.notFound) {
+        toast.push(t('recordNotFound') || 'Skill record is not available yet.', {
+          tone: 'warning',
+        })
+      } else {
+        toast.push(res.message || 'Unable to generate your skill record. Please try again.', {
+          tone: 'error',
+        })
+      }
+    } catch (err) {
+      console.error('Download skill record failed:', err)
+      setDownloading(false)
+      toast.push('Unable to generate your skill record. Please try again.', {
+        tone: 'error',
+      })
+    }
+  }
 
   const record = recordReq.data
   const journey = useMemo(() => buildJourney(record, t), [record, t])
@@ -343,17 +372,15 @@ export default function ClientDashboard() {
             <button
               type="button"
               className="quickact"
-              onClick={() =>
-                toast.push(t('credentialPrepared'), {
-                  detail: t('credentialPreparedDetail'),
-                })
-              }
+              disabled={downloading}
+              onClick={handleDownloadSkillRecord}
+              aria-label={t('downloadSkillRecord')}
             >
               <span className="quickact__icon" aria-hidden="true">
-                ⭳
+                {downloading ? '⏳' : '⭳'}
               </span>
               <span>
-                <strong>{t('downloadSkillRecord')}</strong>
+                <strong>{downloading ? (t('submitting') || 'Generating...') : t('downloadSkillRecord')}</strong>
                 <span>{t('verifiedCredentialPdf')}</span>
               </span>
             </button>

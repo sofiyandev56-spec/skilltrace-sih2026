@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext.jsx'
 import { EvidenceBadge } from '../components/Evidence.jsx'
 import { BUCKET_META } from '../lib/evidence.js'
 import { useGov } from '../gov/GovContext.jsx'
+import { useToast } from '../components/Toast.jsx'
 
 function Choice({ picked, onPick, option }) {
   return (
@@ -27,12 +28,18 @@ export default function CheckIn() {
   const { t } = useGov()
   const { role, user } = useAuth()
   const people = useApi(() => api.getTrainees({}), [])
+  const toast = useToast()
   const [traineeId, setTraineeId] = useState('')
   const [primary, setPrimary] = useState(null)
   const [detail, setDetail] = useState(null)
   const [state, setState] = useState('idle') // idle | sending | done
   const [payload, setPayload] = useState(null)
   const [result, setResult] = useState(null)
+  const [reqCategory, setReqCategory] = useState('Field Officer Assistance')
+  const [reqMessage, setReqMessage] = useState('')
+  const [reqSending, setReqSending] = useState(false)
+  const [reqDone, setReqDone] = useState(false)
+  const [reqResult, setReqResult] = useState(null)
 
   const PRIMARY = [
     { key: 'employed', label: t('employed'), hint: t('employedHint') },
@@ -98,21 +105,61 @@ export default function CheckIn() {
     setState('idle')
     setPayload(null)
     setResult(null)
+    setReqDone(false)
+    setReqResult(null)
+    setReqMessage('')
   }
 
   const submit = async () => {
+    if (state === 'sending' || !trainee?.id) return
     setState('sending')
-    const body = {
-      trainee_id: trainee.id,
-      answer: primary.key,
-      detail: detail.key,
-      employer: trainee.employer || null,
-      source: isOfficer ? 'field_officer' : 'trainee',
-      channel: isOfficer ? 'officer_recorded' : 'self_service',
+    try {
+      const body = {
+        trainee_id: trainee.id,
+        answer: primary.key,
+        detail: detail.key,
+        employer: trainee.employer || null,
+        source: isOfficer ? 'field_officer' : 'trainee',
+        channel: isOfficer ? 'officer_recorded' : 'self_service',
+      }
+      setPayload(body)
+      const res = await api.postCheckin(body)
+      setResult(res)
+      setState('done')
+      toast.push(t('checkinRecorded') || 'Check-in recorded successfully')
+    } catch (err) {
+      console.error('Check-in failed:', err)
+      setState('idle')
+      toast.push('Failed to record check-in. Please try again.', { tone: 'error' })
     }
-    setPayload(body)
-    setResult(await api.postCheckin(body))
-    setState('done')
+  }
+
+  const submitTraineeRequest = async (e) => {
+    if (e) e.preventDefault()
+    if (!trainee?.id || reqSending) return
+    setReqSending(true)
+    try {
+      const res = await api.submitRequest({
+        trainee_id: trainee.id,
+        request_type: reqCategory,
+        description: reqMessage.trim() || null,
+        channel: isOfficer ? 'Officer Assigned Request' : 'Trainee Portal Request',
+      })
+      setReqSending(false)
+      if (res.status === 'success' || res.ok) {
+        setReqDone(true)
+        setReqResult(res.request || res)
+        toast.push(t('requestSubmitted') || 'Request submitted successfully', {
+          detail: t('requestSubmittedDetail') || `Assigned to ${trainee.district || 'District'} evaluation office.`,
+        })
+      } else {
+        toast.push('Could not submit request. Please try again.', { tone: 'error' })
+      }
+    } catch (err) {
+      console.error('Request submission failed:', err)
+      setReqSending(false)
+      toast.push('Could not submit request. Please try again.', { tone: 'error' })
+    }
   }
 
   if (people.loading && !people.data) return <div className="skeleton" style={{ height: 380 }} />
@@ -241,34 +288,112 @@ export default function CheckIn() {
         <div className="stack">
           <div className="panel">
             <div className="panel__head">
-              <div className="panel__title">{t('request')}</div>
+              <div>
+                <div className="panel__title">
+                  {t('requestAssistance') || 'Request Field Assistance / Support'}
+                </div>
+                <div className="panel__hint">
+                  {trainee?.district ? `${trainee.district} District Office · ${trainee.name}` : (t('districtOffice') || 'District Office')}
+                </div>
+              </div>
             </div>
+
             <div className="panel__body">
-              {payload ? (
-                <pre className="receipt" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-{`POST /checkin
-${JSON.stringify(payload, null, 2)}`}
-                </pre>
+              {reqDone ? (
+                <div className="checkin-done" style={{ marginTop: 0 }}>
+                  <div className="checkin-done__tick" aria-hidden="true">
+                    ✓
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Request Registered</h4>
+                    <p className="muted small" style={{ margin: 0 }}>
+                      Your case has been forwarded to the <b>{trainee?.district || 'District'}</b> Evaluation Office. Reference ID: <span className="mono">{reqResult?.request_id || 'REQ-LIVE'}</span>.
+                    </p>
+                    <p className="muted small" style={{ marginTop: 6 }}>
+                      Contact phone: <b>{reqResult?.phone || trainee?.phone || 'On file'}</b> · Status: <b>Pending Field Assignment</b>
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn--sm"
+                      style={{ marginTop: 12 }}
+                      onClick={() => {
+                        setReqDone(false)
+                        setReqMessage('')
+                      }}
+                    >
+                      Submit another request
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <p className="muted small">{t('nothingSentYet')}</p>
+                <form onSubmit={submitTraineeRequest} className="stack" style={{ gap: 14 }}>
+                  <p className="small muted" style={{ margin: 0 }}>
+                    {state === 'done'
+                      ? 'Your status check-in is logged. Need a field officer to corroborate your placement, verify employment, or help resolve a dispute?'
+                      : 'You can submit an official support, verification, or dispute request directly to your district MSDE office.'}
+                  </p>
+
+                  <label className="field">
+                    <span className="label">Assistance Type</span>
+                    <select
+                      value={reqCategory}
+                      onChange={(e) => setReqCategory(e.target.value)}
+                    >
+                      <option value="Field Officer Assistance">Field Officer Visit & In-person Verification</option>
+                      <option value="Placement & Wage Dispute">Placement & Salary Record Dispute</option>
+                      <option value="Certificate / NSQF Correction">NSQF Certificate & Credential Correction</option>
+                      <option value="Career & Retention Support">Career Counseling & Job Placement Support</option>
+                    </select>
+                  </label>
+
+                  <label className="field">
+                    <span className="label">Details or Reason (Optional)</span>
+                    <textarea
+                      rows={3}
+                      placeholder="e.g., Please verify my current job role or update my employer details on the portal."
+                      value={reqMessage}
+                      onChange={(e) => setReqMessage(e.target.value)}
+                      style={{ width: '100%', resize: 'vertical' }}
+                    />
+                  </label>
+
+                  <button
+                    type="submit"
+                    className="btn btn--primary"
+                    disabled={reqSending || !trainee?.id}
+                  >
+                    {reqSending ? (t('submitting') || 'Submitting Request...') : 'Submit Request to Government'}
+                  </button>
+                </form>
               )}
             </div>
           </div>
 
-          <div className="panel">
-            <div className="panel__head">
-              <div className="panel__title">{t('response')}</div>
-            </div>
-            <div className="panel__body">
-              {result ? (
-                <pre className="receipt" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-{JSON.stringify(result, null, 2)}
-                </pre>
-              ) : (
-                <p className="muted small">{t('waitingForSubmission')}</p>
-              )}
-            </div>
-          </div>
+          {(payload || result) ? (
+            <details className="panel" style={{ background: '#f8fafc' }}>
+              <summary style={{ padding: '12px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                Technical Transmission Receipts (API Data)
+              </summary>
+              <div className="panel__body" style={{ borderTop: '1px solid var(--border)' }}>
+                {payload && (
+                  <div>
+                    <div className="label" style={{ marginBottom: 4 }}>Payload Sent:</div>
+                    <pre className="receipt" style={{ margin: '0 0 12px 0', whiteSpace: 'pre-wrap' }}>
+                      {JSON.stringify(payload, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                {result && (
+                  <div>
+                    <div className="label" style={{ marginBottom: 4 }}>Server Response:</div>
+                    <pre className="receipt" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                      {JSON.stringify(result, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </details>
+          ) : null}
         </div>
       </div>
     </div>

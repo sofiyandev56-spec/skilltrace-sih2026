@@ -525,8 +525,38 @@ export function resolveDispute(id, body = {}) {
   return store.currentData().disputes.find((d) => d.id === id)
 }
 
-export function getFollowupQueue() {
-  return store.currentData().followupQueue
+export function getFollowupQueue(filters = {}) {
+  let list = store.currentData().followupQueue || []
+  if (filters?.district) {
+    list = list.filter((r) => r.district === filters.district)
+  }
+  return list
+}
+
+export function submitRequest(body = {}) {
+  const raw = store.rawData()
+  const trainee = raw.trainees.find((t) => t.id === body.trainee_id)
+  const req = {
+    trainee_id: body.trainee_id,
+    name: trainee?.name ?? 'Trainee',
+    phone: trainee?.phone ?? '+91 98000 00000',
+    course: trainee?.course ?? 'NSQF Course',
+    district: trainee?.district ?? 'Thane',
+    provider_id: trainee?.provider_id ?? 'PRV-001',
+    cohort: trainee?.cohort ?? '2025-Q3',
+    attempts: 0,
+    last_contact_date: new Date().toISOString().slice(0, 10),
+    channel: `Trainee Request: ${body.request_type || 'General Assistance'}`,
+    assigned_to: null,
+    assigned_at: null,
+    request_id: `REQ-${Date.now()}`,
+    description: body.description || null,
+  }
+  const current = store.currentData()
+  if (current.followupQueue) {
+    current.followupQueue.unshift(req)
+  }
+  return { ok: true, status: 'success', request: req }
 }
 
 export function assignFollowup(traineeId, officer) {

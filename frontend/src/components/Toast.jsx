@@ -30,16 +30,21 @@ export function ToastProvider({ children }) {
     <ToastCtx.Provider value={value}>
       {children}
       <div className="toasts" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast toast--${t.tone}`}>
+        {toasts.map((toastItem) => (
+          <div key={toastItem.id} className={`toast toast--${toastItem.tone}`}>
             <span className="toast__icon" aria-hidden="true">
-              {t.tone === 'success' ? '✓' : t.tone === 'error' ? '!' : 'i'}
+              {toastItem.tone === 'success' ? '✓' : toastItem.tone === 'error' ? '!' : 'i'}
             </span>
             <div className="toast__text">
-              <strong>{t.message}</strong>
-              {t.detail ? <span>{t.detail}</span> : null}
+              <strong>{toastItem.message}</strong>
+              {toastItem.detail ? <span>{toastItem.detail}</span> : null}
             </div>
-            <button type="button" className="toast__close" onClick={() => dismiss(t.id)} aria-label={t('dismiss') || t('close') || 'Dismiss'}>
+            <button
+              type="button"
+              className="toast__close"
+              onClick={() => dismiss(toastItem.id)}
+              aria-label={typeof t === 'function' ? (t('dismiss') || t('close') || 'Dismiss') : 'Dismiss'}
+            >
               ×
             </button>
           </div>
