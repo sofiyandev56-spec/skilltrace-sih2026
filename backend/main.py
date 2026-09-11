@@ -922,6 +922,135 @@ def get_providers(
         q = q.filter(Provider.district == district)
     return q.all()
 
+@app.get("/providers/{provider_id}")
+def get_provider_detail(provider_id: str, db: Session = Depends(get_db)):
+    """One training centre, with the per-course breakdown the detail page shows."""
+    provider = db.query(Provider).filter(Provider.id == provider_id).first()
+    if not provider:
+        raise HTTPException(status_code=404, detail="Training centre not found.")
+
+    trainees = db.query(Trainee).filter(Trainee.provider_id == provider_id).all()
+    ids = [t.id for t in trainees]
+    events = db.query(Event).filter(Event.trainee_id.in_(ids)).all() if ids else []
+
+    placed = {e.trainee_id for e in events if e.what_happened == "placed"}
+    retained = {e.trainee_id for e in events if e.what_happened == "still_working"}
+    high = {e.trainee_id for e in events if e.trust_level == "high"}
+
+    by_course: Dict[str, Dict[str, Any]] = {}
+    for t in trainees:
+        slot = by_course.setdefault(t.course, {"course": t.course, "certified": 0, "employed": 0})
+        slot["certified"] += 1
+        if t.id in retained:
+            slot["employed"] += 1
+
+    total = len(trainees) or 1
+    return {
+        "id": provider.id,
+        "name": provider.name,
+        "district": provider.district,
+        "certified_count": len(trainees),
+        "headline_placement_pct": round(len(placed) / total * 100, 1),
+        "verified_employment_pct": round(len(retained) / total * 100, 1),
+        "proof_gap": round((len(placed) - len(retained)) / total * 100, 1),
+        "independently_verified_pct": round(len(high) / total * 100, 1),
+        "courses": list(by_course.values()),
+    }
+
+
+@app.get("/attention")
+def get_attention(db: Session = Depends(get_db)):
+    """
+    Ranked findings an officer can act on.
+
+    Computed from the same rows the dashboard counts, so the panel and the
+    headline can never disagree — which they did while this was served from
+    the browser's own seed data.
+    """
+    trainees = db.query(Trainee).all()
+    events = db.query(Event).all()
+    disputes = db.query(Dispute).all()
+
+    retained = {e.trainee_id for e in events if e.what_happened == "still_working"}
+    placed = {e.trainee_id for e in events if e.what_happened == "placed"}
+    self_reported = {e.trainee_id for e in events if e.trust_level == "low"}
+
+    findings: List[Dict[str, Any]] = []
+
+    unproven = placed - retained
+    if unproven:
+        findings.append({
+            "kind": "unverified_outcomes",
+            "count": len(unproven),
+            "severity": "high" if len(unproven) > len(placed) / 2 else "medium",
+        })
+
+    if self_reported:
+        findings.append({
+            "kind": "self_reported",
+            "count": len(self_reported),
+            "severity": "medium",
+        })
+
+    unassigned = [d for d in disputes if d.status != "resolved"]
+    if unassigned:
+        findings.append({
+            "kind": "open_disputes",
+            "count": len(unassigned),
+            "severity": "high",
+        })
+
+    mismatched = [
+        e for e in events
+        if e.what_happened in ("placed", "still_working")
+        and e.job_role
+        and next((t.course for t in trainees if t.id == e.trainee_id), None)
+        not in (None, e.job_role)
+    ]
+    if mismatched:
+        findings.append({
+            "kind": "role_mismatch",
+            "count": len({e.trainee_id for e in mismatched}),
+            "severity": "medium",
+        })
+
+    order = {"high": 0, "medium": 1, "low": 2}
+    findings.sort(key=lambda f: (order.get(f["severity"], 3), -f["count"]))
+    return findings
+
+
+@app.get("/audit")
+def get_audit(
+    source: Optional[str] = None,
+    limit: int = Query(150, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    """The outcome ledger: every event, newest first, never edited in place."""
+    q = db.query(Event)
+    if source:
+        q = q.filter(Event.source == source)
+    rows = q.order_by(Event.date.desc()).limit(limit).all()
+    return {
+        "event_count": db.query(Event).count(),
+        "events": [
+            {
+                "id": e.id,
+                "trainee_id": e.trainee_id,
+                "date": e.date,
+                "event_type": e.what_happened,
+                "what_happened": e.what_happened,
+                "job_role": e.job_role,
+                "employer": e.employer,
+                "salary": e.salary,
+                "source": e.source,
+                "trust_level": e.trust_level,
+                "superseded": False,
+            }
+            for e in rows
+        ],
+    }
+
+
 @app.get("/skill-gap")
 def get_skill_gap(
     district: Optional[str] = None,
