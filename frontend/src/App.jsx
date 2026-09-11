@@ -11,6 +11,7 @@ import GovFooter from './gov/GovFooter.jsx'
 import GovPolicyModal from './gov/GovPolicyModal.jsx'
 import AuthModal from './auth/AuthModal.jsx'
 import { ToastProvider } from './components/Toast.jsx'
+import { useAuth } from './auth/AuthContext.jsx'
 import { ClientRoute, EmployerRoute, MinistryRoute } from './auth/ProtectedRoute.jsx'
 import { routeMetaFor } from './routes.js'
 import Dashboard from './pages/Dashboard.jsx'
@@ -41,10 +42,12 @@ function useDocumentTitle() {
 /** Badge counts for the primary navigation, kept current after any change. */
 function useNavCounts() {
   const [counts, setCounts] = useState({ disputes: 0, followup: 0 })
+  const { officer } = useAuth()
   useEffect(() => {
     let alive = true
     const load = async () => {
-      const [d, f] = await Promise.all([api.getDisputes(), api.getFollowupQueue()])
+      const filter = officer?.district ? { district: officer.district } : {}
+      const [d, f] = await Promise.all([api.getDisputes(filter), api.getFollowupQueue(filter)])
       if (!alive) return
       setCounts({
         disputes: (d || []).filter((x) => x.status !== 'resolved').length,
@@ -57,7 +60,7 @@ function useNavCounts() {
       alive = false
       off()
     }
-  }, [])
+  }, [officer?.district])
   return counts
 }
 

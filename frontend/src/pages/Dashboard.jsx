@@ -53,10 +53,31 @@ export default function Dashboard() {
   const { t } = useGov()
   const { officer } = useAuth()
   // A district officer opens on their own district. Their posting is the
-  // default view, not a filter they have to remember to apply.
+  // default view, and their data scope is strictly bound to that district.
   const [filters, setFilters] = useState(() =>
     officer?.district ? { district: officer.district } : {},
   )
+
+  useEffect(() => {
+    if (officer?.district) {
+      setFilters((prev) => (prev.district === officer.district ? prev : { ...prev, district: officer.district }))
+    }
+  }, [officer?.district])
+
+  const handleFiltersChange = useCallback(
+    (next) => {
+      if (officer?.district) {
+        setFilters((prev) => {
+          const updated = typeof next === 'function' ? next(prev) : next
+          return { ...updated, district: officer.district }
+        })
+      } else {
+        setFilters(next)
+      }
+    },
+    [officer?.district],
+  )
+
   const [nonce, setNonce] = useState(0)
   const [externalChange, setExternalChange] = useState(null)
 
@@ -150,12 +171,12 @@ export default function Dashboard() {
       )}
 
       {officer ? (
-        <OfficerHeader officer={officer} filters={filters} onFilterChange={setFilters} />
+        <OfficerHeader officer={officer} filters={filters} onFilterChange={handleFiltersChange} />
       ) : null}
 
       <FilterBar
         filters={filters}
-        onChange={setFilters}
+        onChange={handleFiltersChange}
         providers={provs.data || []}
         resultCount={d?.total_trainees}
       />
@@ -295,7 +316,7 @@ export default function Dashboard() {
                 <ProviderTable
                   providers={provs.data || []}
                   activeProvider={filters.provider}
-                  onSelect={(id) => setFilters((f) => ({ ...f, provider: id }))}
+                  onSelect={(id) => handleFiltersChange((f) => ({ ...f, provider: id }))}
                 />
               )}
             </div>
@@ -319,7 +340,11 @@ export default function Dashboard() {
                   <DistrictGrid
                     districts={gap.data?.districts || []}
                     activeDistrict={filters.district}
-                    onSelect={(dist) => setFilters((f) => ({ ...f, district: dist }))}
+                    onSelect={(dist) => {
+                      if (!officer?.district) {
+                        handleFiltersChange((f) => ({ ...f, district: dist }))
+                      }
+                    }}
                   />
                 )}
               </div>

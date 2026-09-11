@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast.jsx'
 import Modal from '../components/Modal.jsx'
 import { longDate, relativeAge } from '../lib/format.js'
 import { useGov } from '../gov/GovContext.jsx'
+import { useAuth } from '../auth/AuthContext.jsx'
 
 /* ------------------------------------------------------------------ */
 /* assignment dialog                                                   */
@@ -234,7 +235,10 @@ export default function Disputes() {
   const [busy, setBusy] = useState(false)
   const toast = useToast()
 
-  const { data, loading, reload } = useApi(() => api.getDisputes(), [])
+  const { officer: currentOfficer } = useAuth()
+  const districtFilter = currentOfficer?.district ? { district: currentOfficer.district } : {}
+
+  const { data, loading, reload } = useApi(() => api.getDisputes(districtFilter), [currentOfficer?.district])
   const officersReq = useApi(() => api.getFieldOfficers(), [])
 
   const disputes = data || []
@@ -253,12 +257,16 @@ export default function Disputes() {
   const statusLabel = (d) =>
     d.status === 'resolved' ? t('statusResolved') : d.assigned_officer_id ? t('statusUnderReview') : t('statusDisputed')
 
+  const actorName = currentOfficer?.name
+    ? `${currentOfficer.name}${currentOfficer.cadre ? ', ' + currentOfficer.cadre : ''}`
+    : 'Government officer (demo)'
+
   const handleAssign = async (officerId, note) => {
     setBusy(true)
     const res = await api.assignFieldOfficer(assignTarget.id, {
       officer_id: officerId,
       note,
-      assigned_by: 'Dr. S. K. Sharma, IES',
+      assigned_by: actorName,
     })
     await Promise.all([reload(), officersReq.reload()])
     setBusy(false)
@@ -274,7 +282,7 @@ export default function Disputes() {
     await api.resolveDispute(resolveTarget.id, {
       resolution,
       note,
-      resolved_by: 'Dr. S. K. Sharma, IES',
+      resolved_by: actorName,
     })
     await reload()
     setBusy(false)

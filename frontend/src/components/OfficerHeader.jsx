@@ -101,26 +101,11 @@ export default function OfficerHeader({ officer, filters, onFilterChange }) {
 
         <div className="officer__actions">
           {districtScoped ? (
-            <div className="officer__scope">
-              <span className="officer__scope-label">{t('ohJurisdiction')}</span>
-              <div className="officer__toggle" role="group" aria-label={t('ohJurisdiction')}>
-                <button
-                  type="button"
-                  className={`btn btn--sm${onOwnDistrict ? ' btn--primary' : ''}`}
-                  aria-pressed={onOwnDistrict}
-                  onClick={() => toggleScope(true)}
-                >
-                  {t('ohAssignedDistrict', officer.district)}
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn--sm${onOwnDistrict ? '' : ' btn--primary'}`}
-                  aria-pressed={!onOwnDistrict}
-                  onClick={() => toggleScope(false)}
-                >
-                  {t('ohAllDistricts')}
-                </button>
-              </div>
+            <div className="officer__pill">
+              <span className="officer__pill-title">
+                {officer.district}
+              </span>
+              <span className="officer__pill-sub">{t('ohAssignedDistrict', officer.district)}</span>
             </div>
           ) : (
             <div className="officer__pill">
@@ -133,7 +118,7 @@ export default function OfficerHeader({ officer, filters, onFilterChange }) {
         </div>
       </div>
 
-      {districtScoped && onOwnDistrict ? (
+      {districtScoped ? (
         <p className="officer__footer">
           <span className="officer__footer-tick" aria-hidden="true">
             &#10003;

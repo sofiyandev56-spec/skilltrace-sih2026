@@ -3,6 +3,7 @@ import { api } from '../api/client.js'
 import { useApi } from '../lib/useApi.js'
 import { longDate, relativeAge } from '../lib/format.js'
 import { useGov } from '../gov/GovContext.jsx'
+import { useAuth } from '../auth/AuthContext.jsx'
 
 const OFFICERS = [
   'S. Kulkarni (Pune div.)',
@@ -23,7 +24,12 @@ function Attempts({ n, t }) {
 
 export default function FollowupQueue() {
   const { t } = useGov()
-  const { data, loading, reload } = useApi(() => api.getFollowupQueue(), [])
+  const { officer: currentOfficer } = useAuth()
+  const districtFilter = currentOfficer?.district ? { district: currentOfficer.district } : {}
+  const { data, loading, reload } = useApi(
+    () => api.getFollowupQueue(districtFilter),
+    [currentOfficer?.district],
+  )
   const [assigning, setAssigning] = useState(null)
   const [officer, setOfficer] = useState(OFFICERS[0])
   const [busy, setBusy] = useState(false)

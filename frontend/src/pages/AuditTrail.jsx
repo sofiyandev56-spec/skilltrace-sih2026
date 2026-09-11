@@ -5,6 +5,7 @@ import { EvidenceBadge } from '../components/Evidence.jsx'
 import Modal from '../components/Modal.jsx'
 import { longDate } from '../lib/format.js'
 import { useGov } from '../gov/GovContext.jsx'
+import { useAuth } from '../auth/AuthContext.jsx'
 
 /**
  * Event names are interface text, not record data, so they are translated
@@ -154,7 +155,9 @@ function EventDetail({ event, onClose }) {
 
 export default function AuditTrail() {
   const { t } = useGov()
-  const { data, loading } = useApi(() => api.getAuditLog({}), [])
+  const { officer } = useAuth()
+  const districtFilter = officer?.district ? { district: officer.district } : {}
+  const { data, loading } = useApi(() => api.getAuditLog(districtFilter), [officer?.district])
   const [detail, setDetail] = useState(null)
   const [sourceFilter, setSourceFilter] = useState('all')
 
