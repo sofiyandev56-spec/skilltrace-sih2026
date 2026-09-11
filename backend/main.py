@@ -416,6 +416,18 @@ FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 MASTER_GOV_EMAIL = "shlok.borad11@gmail.com"
 
 
+def withdrawn_trainee_ids(db: Session) -> set:
+    """
+    Trainees who have withdrawn consent under the DPDPA.
+
+    The privacy strip on the dashboard promises that a withdrawal removes the
+    person from every figure — "not anonymised, not retained in the
+    denominator, removed". The frontend's offline store honoured that; the
+    API counted them anyway. Every aggregate now subtracts this set first.
+    """
+    return {c.trainee_id for c in db.query(Consent.trainee_id).filter(Consent.granted == False).all()}
+
+
 def require_admin(current_user: Optional[User]) -> User:
     """
     Gate for the Master Portal endpoints.
@@ -942,7 +954,8 @@ def get_dashboard(
             elif key == "category":
                 query = query.filter(Trainee.category == val)
 
-    trainees = query.all()
+    withdrawn = withdrawn_trainee_ids(db)
+    trainees = [t for t in query.all() if t.id not in withdrawn]
     total = len(trainees)
 
     # ------------------------------------------------------------------
@@ -1107,11 +1120,11 @@ def get_dashboard(
     for f in funnel:
         f["pct"] = pct(f["count"], total)
 
-    consent_ids = set(ids)
-    total_consents = db.query(Consent).filter(Consent.trainee_id.in_(ids)).count() if ids else 0
-    granted_consents = (
-        db.query(Consent).filter(Consent.trainee_id.in_(ids), Consent.granted == True).count() if ids else 0
-    )
+    # "X of Y records included": Y is everyone the filter matched before the
+    # withdrawn were removed, so the strip can say how many it took out.
+    matched_ids = [t.id for t in query.all()]
+    total_consents = len(matched_ids)
+    granted_consents = total
 
     return {
         "as_of": as_of,
@@ -1193,9 +1206,10 @@ def get_attention(db: Session = Depends(get_db)):
     a headline, the unit it concerns, and a sentence saying why.
     """
     providers = {p.id: p for p in db.query(Provider).all()}
-    trainees = db.query(Trainee).all()
-    events = db.query(Event).all()
-    disputes = db.query(Dispute).all()
+    withdrawn = withdrawn_trainee_ids(db)
+    trainees = [t for t in db.query(Trainee).all() if t.id not in withdrawn]
+    events = [e for e in db.query(Event).all() if e.trainee_id not in withdrawn]
+    disputes = [d for d in db.query(Dispute).all() if d.trainee_id not in withdrawn]
 
     placed = {e.trainee_id for e in events if e.what_happened == "placed"}
     retained = {e.trainee_id for e in events if e.what_happened == "still_working"}
@@ -1289,6 +1303,9 @@ def get_audit(
 ):
     """The outcome ledger: every event, newest first, never edited in place."""
     q = db.query(Event)
+    withdrawn = withdrawn_trainee_ids(db)
+    if withdrawn:
+        q = q.filter(~Event.trainee_id.in_(withdrawn))
     if source:
         q = q.filter(Event.source == source)
     if district:
@@ -1593,7 +1610,8 @@ def get_disputes(
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    disputes = db.query(Dispute).all()
+    withdrawn = withdrawn_trainee_ids(db)
+    disputes = [d for d in db.query(Dispute).all() if d.trainee_id not in withdrawn]
     # A district officer's console sends their district on every call; the
     # badge and the list must count the same people the dashboard does.
     if district:

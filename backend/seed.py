@@ -413,7 +413,10 @@ def seed_national_dataset(db):
             id=c["id"],
             trainee_id=c["trainee_id"],
             purpose=", ".join(c.get("scopes", [])) or "outcome tracking",
-            granted=(c.get("status", "active") == "active"),
+            # The dataset records consent as 'granted' or 'withdrawn'. Checking
+            # for 'active' here stored every one of 15,000 consents as withdrawn
+            # and the privacy strip announced that nobody was counted.
+            granted=(c.get("status") == "granted"),
             date=c.get("granted_date") or c.get("withdrawn_date") or "",
         ))
 
