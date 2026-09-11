@@ -103,6 +103,13 @@ export async function loginGoogle({ credential, email, name, preferredRole }) {
   return { ok: true, token: res.data.access_token, session: toSession(res.data) }
 }
 
+/** Creates an account from the phone sign-up flow. */
+export async function register(profile) {
+  const res = await post('/auth/register', profile)
+  if (!res.ok) return { ok: false, detail: res.detail }
+  return { ok: true, token: res.data.access_token, session: toSession(res.data) }
+}
+
 /** Re-reads the signed-in user, so a restored token cannot carry a stale role. */
 export async function me(token = getToken()) {
   if (!token) return null

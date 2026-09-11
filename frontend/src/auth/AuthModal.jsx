@@ -144,7 +144,7 @@ export default function AuthModal() {
                 <button
                   type="button"
                   className="auth-btn auth-btn--google"
-                  onClick={loginGoogle}
+                  onClick={() => loginGoogle('client')}
                   disabled={modalState.loading}
                 >
                   <svg className="auth-btn__icon" viewBox="0 0 24 24" width="18" height="18">

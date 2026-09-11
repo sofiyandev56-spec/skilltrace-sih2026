@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as backendAuth from './backendAuth.js'
+import * as ministryAuth from './ministryAuth.js'
+import { API_BASE } from '../api/client.js'
 
 const AuthContext = createContext(null)
 
@@ -14,13 +16,15 @@ const AuthContext = createContext(null)
  * not independent, so there is no way to hold two roles at once or to
  * promote yourself by writing to state.
  */
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
-
 export function AuthProvider({ children }) {
   const navigate = useNavigate()
 
   const [session, setSession] = useState(null)
   const [restoring, setRestoring] = useState(true)
+
+  // The ministry session is separate by design: different store, different
+  // lifetime, different credentials. Holding one never implies the other.
+  const [officer, setOfficer] = useState(() => ministryAuth.readSession())
 
   const [modalState, setModalState] = useState({
     isOpen: false,
@@ -54,10 +58,11 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const role = session?.role ?? null
-  const isMinistry = role === 'government'
-  const isClient = role === 'client'
-  const isEmployer = role === 'employer'
+  const backendRole = session?.role ?? null
+  const isMinistry = Boolean(officer)
+  const isClient = backendRole === 'client'
+  const isEmployer = backendRole === 'employer'
+  const role = isMinistry ? 'ministry' : backendRole
 
   const openLogin = (step = 'select') => {
     setModalState({
@@ -92,19 +97,19 @@ export function AuthProvider({ children }) {
   /* ---- password sign-in ------------------------------------------- */
 
   /**
-   * Ministry sign-in. The server authenticates; this only refuses to seat a
-   * session that did not come back as a government role, so a valid trainee
-   * credential entered on the officer form cannot open the console.
+   * Ministry sign-in, checked against the ten issued Officer IDs.
+   *
+   * Deliberately not the backend account system: the governance console is
+   * opened only by an Officer ID from ministryAuth's list, so no Google
+   * account and no ordinary backend user — whatever role it carries — can
+   * reach it. ministryAuth is the only module that can see the officer list.
    */
-  const loginMinistry = async (identifier, password) => {
-    const res = await backendAuth.login(identifier, password)
-    if (!res.ok) return res
-    if (res.session?.role !== 'government') {
-      // Nothing was stored, so whoever was already signed in stays signed in.
-      return { ok: false, reason: 'invalid' }
-    }
-    adopt(res.session, res.token, { navigateHome: false })
-    return { ok: true, officer: res.session }
+  const loginMinistry = async (officerId, password) => {
+    const result = ministryAuth.authenticate(officerId, password)
+    if (!result.ok) return result
+    ministryAuth.saveSession(result.officer)
+    setOfficer(result.officer)
+    return result
   }
 
   /** Trainee/employer sign-in through the ordinary modal. */
@@ -120,76 +125,27 @@ export function AuthProvider({ children }) {
 
   /* ---- Google ------------------------------------------------------ */
 
-  const loadGoogle = () =>
-    new Promise((resolve) => {
-      if (window.google?.accounts?.oauth2) return resolve(window.google)
-      let tries = 0
-      const tick = setInterval(() => {
-        tries += 1
-        if (window.google?.accounts?.oauth2) {
-          clearInterval(tick)
-          resolve(window.google)
-        } else if (tries > 40) {
-          clearInterval(tick)
-          resolve(null)
-        }
-      }, 100)
-    })
-
   /**
-   * Google sign-in. The role is decided by the backend from its own
-   * whitelist — `preferredRole` is a hint the server may ignore, so signing
-   * in with Google can never by itself produce an officer session.
+   * Google sign-in.
+   *
+   * Hands off to the backend, which owns the client secret and performs the
+   * code exchange with Google. The browser never sees the secret, and the
+   * role is whatever the server decides — signing in with Google cannot by
+   * itself produce an officer session.
    */
-  const loginGoogle = async (preferredRole = 'client') => {
-    setModalState((prev) => ({ ...prev, loading: true, error: '' }))
+  const loginGoogle = (preferredRole = 'client') => {
+    const url = new URL(`${API_BASE}/auth/google/start`)
+    if (preferredRole === 'employer') url.searchParams.set('role', preferredRole)
+    window.location.assign(url.toString())
+    return Promise.resolve({ ok: true, redirecting: true })
+  }
 
-    if (!GOOGLE_CLIENT_ID) {
-      setModalState((prev) => ({ ...prev, loading: false, error: 'google_unconfigured' }))
-      return { ok: false, reason: 'unconfigured' }
-    }
-
-    const google = await loadGoogle()
-    if (!google) {
-      setModalState((prev) => ({ ...prev, loading: false, error: 'google_unavailable' }))
-      return { ok: false, reason: 'unavailable' }
-    }
-
-    return new Promise((resolve) => {
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: 'openid email profile',
-        callback: async (response) => {
-          if (!response?.access_token) {
-            setModalState((prev) => ({ ...prev, loading: false, error: 'google_cancelled' }))
-            resolve({ ok: false, reason: 'cancelled' })
-            return
-          }
-          try {
-            const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-              headers: { Authorization: `Bearer ${response.access_token}` },
-            })
-            const profile = await profileRes.json()
-            const out = await backendAuth.loginGoogle({
-              email: profile.email,
-              name: profile.name,
-              preferredRole,
-            })
-            if (!out.ok) {
-              setModalState((prev) => ({ ...prev, loading: false, error: 'google_rejected' }))
-              resolve(out)
-              return
-            }
-            adopt(out.session, out.token)
-            resolve(out)
-          } catch {
-            setModalState((prev) => ({ ...prev, loading: false, error: 'google_unavailable' }))
-            resolve({ ok: false, reason: 'unavailable' })
-          }
-        },
-      })
-      client.requestAccessToken()
-    })
+  /** Seats a session from the token the OAuth callback handed back. */
+  const completeGoogle = async (token) => {
+    const fresh = await backendAuth.me(token)
+    if (!fresh) return { ok: false }
+    adopt(fresh, token)
+    return { ok: true, session: fresh }
   }
 
   /* ---- WhatsApp OTP ------------------------------------------------ */
@@ -233,10 +189,17 @@ export function AuthProvider({ children }) {
 
   const completeProfile = async (profileData) => {
     setModalState((prev) => ({ ...prev, loading: true, error: '' }))
-    const res = await backendAuth.loginGoogle({
-      email: profileData.email || `${modalState.phone}@skilltrace.local`,
+    // Registration, not Google: this account is being created from a verified
+    // phone number, and /auth/google is for identities Google has vouched for.
+    const res = await backendAuth.register({
       name: profileData.name?.trim(),
-      preferredRole: 'client',
+      email: profileData.email || `${modalState.phone}@skilltrace.local`,
+      password: crypto.randomUUID(),
+      phone: modalState.phone,
+      role: 'client',
+      course: profileData.course || null,
+      district: profileData.district || null,
+      category: profileData.category || null,
     })
     if (!res.ok) {
       setModalState((prev) => ({ ...prev, loading: false, error: 'profile_failed' }))
@@ -255,22 +218,26 @@ export function AuthProvider({ children }) {
   }
 
   const logout = () => endSession('/client')
-  const logoutMinistry = () => endSession('/ministry/login')
+
+  const logoutMinistry = () => {
+    ministryAuth.clearSession()
+    setOfficer(null)
+    navigate('/ministry/login', { replace: true })
+  }
 
   return (
     <AuthContext.Provider
       value={{
         // Three views onto one session — never three sessions.
         user: isClient ? session : null,
-        officer: isMinistry ? session : null,
+        officer,
         employer: isEmployer ? session : null,
         session,
         restoring,
         isAuthenticated: isClient,
         isMinistry,
         isEmployer,
-        role: isMinistry ? 'ministry' : role,
-        googleConfigured: Boolean(GOOGLE_CLIENT_ID),
+        role,
         // Master status is read from the server's own answer, not inferred
         // from an email string in the browser.
         isMasterAdmin: Boolean(session?.is_master || session?.permissions?.is_master_admin),
@@ -287,6 +254,7 @@ export function AuthProvider({ children }) {
         verifyOtp,
         completeProfile,
         loginGoogle,
+        completeGoogle,
         loginPassword,
         loginMinistry,
         logoutMinistry,

@@ -26,6 +26,7 @@ import ChatbotWidget from './chatbot/ChatbotWidget.jsx'
 import EmployerDashboard from './pages/EmployerDashboard.jsx'
 import MasterPortal from './pages/MasterPortal.jsx'
 import GovAuditLogs from './pages/GovAuditLogs.jsx'
+import GoogleCallback from './pages/GoogleCallback.jsx'
 
 /** Keeps the browser tab title in step with the page and the language. */
 function useDocumentTitle() {
@@ -106,6 +107,9 @@ export default function App() {
         <Routes>
           {/* ---- Ministry: governance, analytics, adjudication ---- */}
           <Route path="/ministry/login" element={<MinistryLogin />} />
+
+          {/* Where Google returns the browser after sign-in. */}
+          <Route path="/auth/google" element={<GoogleCallback />} />
           <Route path="/ministry" element={<MinistryRoute><Dashboard /></MinistryRoute>} />
           <Route path="/ministry/disputes" element={<MinistryRoute><Disputes /></MinistryRoute>} />
           <Route path="/ministry/follow-up" element={<MinistryRoute><FollowupQueue /></MinistryRoute>} />

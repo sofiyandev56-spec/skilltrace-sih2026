@@ -22,6 +22,7 @@ export const ROUTE_META = {
     sectionKey: 'secTransparency',
   },
   '/employer': { titleKey: 'edTitle', descKey: 'edSubtitle', sectionKey: 'navEmployer' },
+  '/auth/google': { titleKey: 'gcSigningIn', descKey: null, sectionKey: 'secAccess' },
   '/client': { titleKey: 'titleClient', descKey: 'descClient', sectionKey: 'navRights' },
   '/client/consent': { titleKey: 'titleConsent', descKey: 'descConsent', sectionKey: 'navRights' },
   '/client/check-in': { titleKey: 'titleCheckin', descKey: 'descCheckin', sectionKey: 'navCollection' },

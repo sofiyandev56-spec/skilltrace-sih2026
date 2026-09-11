@@ -1,9 +1,18 @@
 import os
 import json
 import re
+import secrets
+from urllib.parse import urlencode
+import requests
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
+from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, status, Query, Body
+from fastapi.responses import RedirectResponse
+
+# Credentials live in backend/.env, which is gitignored. Loaded before any
+# module-level os.getenv below runs.
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -395,8 +404,15 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         }
     }
 
-GOOGLE_CLIENT_ID = "998932758436-8a4l4j9klve2n874gff2cpe621t16grd.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET = "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"
+# Google OAuth credentials. These were committed as literals; they now come
+# from the environment and the process refuses to start an OAuth flow without
+# them. The secret must never reach the browser.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.getenv(
+    "GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback"
+)
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 MASTER_GOV_EMAIL = "shlok.borad11@gmail.com"
 
 
@@ -421,67 +437,38 @@ def require_admin(current_user: Optional[User]) -> User:
         raise HTTPException(status_code=403, detail="Access restricted to Master Sovereign Authority.")
     return current_user
 
-@app.post("/auth/google", response_model=TokenResponse)
-def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
-    email = payload.email.strip().lower() if payload.email else None
-    name = payload.name.strip() if payload.name else None
-    role = payload.role or "client"
+def _google_upsert_user(db: Session, *, email: str, name: str, requested_role: Optional[str]):
+    """
+    Find or create the account behind a verified Google identity.
 
-    # If Google Identity Services JWT credential provided, parse payload claims
-    if payload.credential:
-        try:
-            token_claims = jwt.decode(payload.credential, options={"verify_signature": False})
-            if token_claims.get("email"):
-                email = str(token_claims["email"]).strip().lower()
-            if token_claims.get("name"):
-                name = str(token_claims["name"]).strip()
-        except Exception:
-            pass
-
-    if not email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Valid Google account email or credential is required for Google Sign-In."
-        )
-
-    if not name:
-        name = email.split("@")[0].replace(".", " ").title()
-
+    A requested role is only ever a request: a new account that is not the
+    master address lands unverified, and an officer role is granted from the
+    Master Portal, never by asking for it at sign-in.
+    """
     is_master = email == MASTER_GOV_EMAIL
-
-    # Lookup or create user
     user = db.query(User).filter(User.email.ilike(email)).first()
-    if not user:
-        user_id = f"GGL-{datetime.utcnow().strftime('%M%S')}"
-        assigned_role = "government" if is_master else role
-        is_verified = True if is_master else False  # Direct logins for non-master are unverified
-        designation = (
-            "Master Government Officer & Sovereign Administrator"
-            if is_master
-            else "Pending Master Verification"
-        )
-        ministry = (
-            "Ministry of Skill Development and Entrepreneurship"
-            if is_master
-            else None
-        )
-        company = "Sanjeevani Hospital" if (assigned_role == "employer" and is_verified) else None
 
+    if not user:
+        assigned_role = "government" if is_master else (requested_role or "client")
+        if assigned_role == "government" and not is_master:
+            assigned_role = "client"
         user = User(
-            id=user_id,
+            id=f"GGL-{secrets.token_hex(4).upper()}",
             name=name,
             email=email,
             role=assigned_role,
-            designation=designation,
-            ministry=ministry,
-            company_name=company,
-            hashed_password=hash_password("google_oauth_verified"),
-            verified=is_verified,
-            last_login=datetime.utcnow().strftime("%Y-%m-%d %H:%M IST")
+            designation=(
+                "Master Government Officer & Sovereign Administrator"
+                if is_master
+                else "Pending Master Verification"
+            ),
+            ministry="Ministry of Skill Development and Entrepreneurship" if is_master else None,
+            company_name=None,
+            hashed_password=hash_password(secrets.token_urlsafe(32)),
+            verified=bool(is_master),
+            last_login=datetime.utcnow().strftime("%Y-%m-%d %H:%M IST"),
         )
         db.add(user)
-        db.commit()
-        db.refresh(user)
     else:
         user.last_login = datetime.utcnow().strftime("%Y-%m-%d %H:%M IST")
         if is_master:
@@ -489,8 +476,164 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
             user.verified = True
             user.designation = "Master Government Officer & Sovereign Administrator"
             user.ministry = "Ministry of Skill Development and Entrepreneurship"
-        db.commit()
-        db.refresh(user)
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+# ---- Google OAuth 2.0, authorisation-code flow -----------------------
+# The browser never sees the client secret: it is used only here, server to
+# server, to exchange the one-time code for a verified identity.
+
+_GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+_GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+
+# Single-use state values, to bind the callback to the request that began it.
+_oauth_states: Dict[str, datetime] = {}
+
+
+def _prune_states() -> None:
+    cutoff = datetime.utcnow() - timedelta(minutes=10)
+    for k in [k for k, v in _oauth_states.items() if v < cutoff]:
+        _oauth_states.pop(k, None)
+
+
+def _verify_google_id_token(id_token: str) -> Dict[str, Any]:
+    """
+    Ask Google whether this token is real and was issued to us.
+
+    Decoding the token locally without checking its signature would let anyone
+    present a handwritten JWT claiming any address, so the check happens at
+    Google and the audience is compared against our own client id.
+    """
+    try:
+        res = requests.get(_GOOGLE_TOKENINFO_URL, params={"id_token": id_token}, timeout=10)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not reach Google to verify sign-in.")
+    if res.status_code != 200:
+        raise HTTPException(status_code=401, detail="Google sign-in could not be verified.")
+    claims = res.json()
+    if claims.get("aud") != GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=401, detail="Google sign-in was issued for another application.")
+    if claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+        raise HTTPException(status_code=401, detail="Google sign-in has an unexpected issuer.")
+    if str(claims.get("email_verified", "")).lower() not in ("true", "1"):
+        raise HTTPException(status_code=401, detail="That Google account has no verified email address.")
+    return claims
+
+
+@app.get("/auth/google/start")
+def google_start(role: Optional[str] = None):
+    """Begin sign-in. Redirects to Google's consent screen."""
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured on this server.")
+    _prune_states()
+    state = secrets.token_urlsafe(24)
+    _oauth_states[state] = datetime.utcnow()
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+    if role in ("client", "employer"):
+        params["state"] = f"{state}.{role}"
+        _oauth_states[params["state"]] = _oauth_states.pop(state)
+    return RedirectResponse(f"{_GOOGLE_AUTH_URL}?{urlencode(params)}")
+
+
+@app.get("/auth/google/callback")
+def google_callback(
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Google's redirect back. Exchanges the code for a verified identity, seats
+    the session using the application's existing JWT, and hands the browser
+    back to the frontend.
+    """
+    def _fail(reason: str) -> RedirectResponse:
+        return RedirectResponse(f"{FRONTEND_ORIGIN}/auth/google?error={reason}")
+
+    if error or not code or not state:
+        return _fail("cancelled")
+
+    _prune_states()
+    if _oauth_states.pop(state, None) is None:
+        # Unknown or reused state: the callback did not come from a flow we began.
+        return _fail("state")
+
+    requested_role = state.split(".", 1)[1] if "." in state else None
+
+    try:
+        token_res = requests.post(
+            _GOOGLE_TOKEN_URL,
+            data={
+                "code": code,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri": GOOGLE_REDIRECT_URI,
+                "grant_type": "authorization_code",
+            },
+            timeout=10,
+        )
+    except Exception:
+        return _fail("network")
+
+    if token_res.status_code != 200:
+        return _fail("exchange")
+
+    id_token = token_res.json().get("id_token")
+    if not id_token:
+        return _fail("exchange")
+
+    try:
+        claims = _verify_google_id_token(id_token)
+    except HTTPException:
+        return _fail("verify")
+
+    email = str(claims.get("email", "")).strip().lower()
+    if not email:
+        return _fail("verify")
+    name = str(claims.get("name") or email.split("@")[0].replace(".", " ").title())
+
+    user = _google_upsert_user(db, email=email, name=name, requested_role=requested_role)
+    token = create_access_token({"sub": user.id, "role": user.role, "name": user.name})
+    return RedirectResponse(f"{FRONTEND_ORIGIN}/auth/google#token={token}")
+
+
+@app.post("/auth/google", response_model=TokenResponse)
+def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
+    """
+    Sign in with a Google Identity Services credential.
+
+    This used to decode the credential with verify_signature disabled, and to
+    accept a bare `email` with no credential at all — so a handwritten request
+    naming any address was granted that account, the master administrator
+    included. The credential is now required and checked with Google before
+    anything is issued.
+    """
+    if not payload.credential:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A Google credential is required. Use /auth/google/start for the redirect flow.",
+        )
+
+    claims = _verify_google_id_token(payload.credential)
+    email = str(claims.get("email", "")).strip().lower()
+    if not email:
+        raise HTTPException(status_code=401, detail="Google sign-in could not be verified.")
+    name = str(claims.get("name") or email.split("@")[0].replace(".", " ").title())
+    role = payload.role or "client"
+
+    user = _google_upsert_user(db, email=email, name=name, requested_role=role)
 
     token = create_access_token({"sub": user.id, "role": user.role, "name": user.name})
     return {
