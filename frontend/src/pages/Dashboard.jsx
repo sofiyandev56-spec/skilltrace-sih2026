@@ -58,25 +58,10 @@ export default function Dashboard() {
     officer?.district ? { district: officer.district } : {},
   )
 
-  useEffect(() => {
-    if (officer?.district) {
-      setFilters((prev) => (prev.district === officer.district ? prev : { ...prev, district: officer.district }))
-    }
-  }, [officer?.district])
-
-  const handleFiltersChange = useCallback(
-    (next) => {
-      if (officer?.district) {
-        setFilters((prev) => {
-          const updated = typeof next === 'function' ? next(prev) : next
-          return { ...updated, district: officer.district }
-        })
-      } else {
-        setFilters(next)
-      }
-    },
-    [officer?.district],
-  )
+  // An officer's posting is where the dashboard opens, not a wall around
+  // it: the jurisdiction toggle lets them widen to every district, so the
+  // district must be a default here and never re-applied on their behalf.
+  const handleFiltersChange = useCallback((next) => setFilters(next), [])
 
   const [nonce, setNonce] = useState(0)
   const [externalChange, setExternalChange] = useState(null)

@@ -1,0 +1,15 @@
+{
+  "name": "skilltrace",
+  "private": true,
+  "description": "SkillTrace — one command starts the API and the frontend together.",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "python3 -m uvicorn backend.main:app --host 127.0.0.1 --port 8000",
+    "dev:web": "npm run dev --prefix frontend -- --port 5173 --strictPort",
+    "build": "npm run build --prefix frontend",
+    "setup": "python3 -m pip install -r backend/requirements.txt && npm install --prefix frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -27,13 +27,21 @@ This repository currently contains the **frontend** (`frontend/`).
 
 ## Running it
 
+One command starts both the API and the frontend:
+
 ```bash
-cd frontend
-npm install
+npm run setup   # first time only: Python deps, frontend deps, concurrently
 npm run dev
 ```
 
-Then open <http://localhost:5173>. **No backend is required** — see below.
+Then open <http://localhost:5173>. The API is at <http://127.0.0.1:8000>; on
+its first start it seeds `backend/skilltrace.db` from `frontend/src/api/mock/
+data/organized_data.json` and the spreadsheets in `data/source/` (about two
+minutes), and on every start it prints which database file it opened and how
+many trainees it holds. If the dashboard badge reads **Mock data**, the API is
+not running — the frontend has fallen back to its offline copy of the dataset.
+
+To run only one side: `npm run dev:api` or `npm run dev:web`.
 
 ## Backend, and running without one
 

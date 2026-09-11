@@ -9,7 +9,11 @@
  */
 import * as mock from './mock/handlers.js'
 
-export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+// 127.0.0.1, not localhost. On macOS `localhost` resolves to ::1 before
+// 127.0.0.1, and the backend listens on IPv4; Chromium quietly retries over
+// IPv4, Safari and Firefox do not, and the page then renders the offline
+// store under a "Mock data" badge with a live backend sitting right there.
+export const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
 const FORCE_MOCK = import.meta.env.VITE_FORCE_MOCK === '1'
 // Long enough for the whole-cohort analytics (about 2 s cold on a laptop),
 // short enough that an absent backend still falls back before the page

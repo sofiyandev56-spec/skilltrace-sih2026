@@ -97,13 +97,40 @@ async def _invalidate_on_write(request, call_next):
     return response
 
 
+# The dev frontend may be reached as localhost or 127.0.0.1, and Vite moves
+# to the next port when 5173 is taken, so each of those is named here. A
+# wildcard with credentials is not a valid combination and was being handled
+# by echoing whatever origin asked; this lists the origins actually allowed.
+_DEV_ORIGINS = [
+    f"http://{host}:{port}"
+    for host in ("localhost", "127.0.0.1", "[::1]")
+    for port in range(5173, 5180)
+]
+_EXTRA_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_DEV_ORIGINS + _EXTRA_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _announce_database():
+    """One line that settles "which database is this backend reading?"."""
+    from .database import DB_PATH
+    db = SessionLocal()
+    try:
+        n = db.query(Trainee).count()
+        d = db.query(Trainee.district).distinct().count()
+    finally:
+        db.close()
+    import logging
+    logging.getLogger("uvicorn.error").info(
+        "SkillTrace API: database %s — %s trainees across %s districts", DB_PATH, f"{n:,}", d
+    )
 
 # -------------------------------------------------------------------
 # Schemas
