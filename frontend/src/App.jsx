@@ -27,6 +27,7 @@ import EmployerDashboard from './pages/EmployerDashboard.jsx'
 import MasterPortal from './pages/MasterPortal.jsx'
 import GovAuditLogs from './pages/GovAuditLogs.jsx'
 import GoogleCallback from './pages/GoogleCallback.jsx'
+import ClientBottomNav from './components/ClientBottomNav.jsx'
 
 /** Keeps the browser tab title in step with the page and the language. */
 function useDocumentTitle() {
@@ -159,6 +160,7 @@ export default function App() {
         <GovPolicyModal />
         <AuthModal />
         <ChatbotWidget />
+        <ClientBottomNav />
       </div>
     </ToastProvider>
   )

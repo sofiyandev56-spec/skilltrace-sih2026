@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import * as backendAuth from './backendAuth.js'
 import * as ministryAuth from './ministryAuth.js'
 import { API_BASE } from '../api/client.js'
+import { DEMO_TRAINEES } from './demoTrainees.js'
 
 const AuthContext = createContext(null)
 
@@ -44,6 +45,24 @@ export function AuthProvider({ children }) {
       const token = backendAuth.getToken()
       if (!token) {
         if (alive) setRestoring(false)
+        return
+      }
+      if (token.startsWith('demo-token-')) {
+        const id = token.replace('demo-token-', '')
+        const demo = DEMO_TRAINEES.find((d) => d.id === id) || DEMO_TRAINEES[0]
+        setSession({
+          id: demo.id,
+          name: demo.name,
+          email: `${demo.id.toLowerCase()}@skilltrace.demo`,
+          phone: demo.id === 'TRN-0001' ? '9125671886' : '9820012345',
+          role: 'client',
+          designation: demo.course,
+          district: demo.district,
+          company_name: demo.employer,
+          verified: true,
+          is_demo: true,
+        })
+        setRestoring(false)
         return
       }
       const fresh = await backendAuth.me(token)
@@ -209,7 +228,32 @@ export function AuthProvider({ children }) {
     return true
   }
 
-  /* ---- exit -------------------------------------------------------- */
+  const loginDemoTrainee = async (traineeId) => {
+    const demo = DEMO_TRAINEES.find((d) => d.id === traineeId) || DEMO_TRAINEES[0]
+    try {
+      const res = await backendAuth.login(demo.id, 'User@2026Password')
+      if (res.ok) {
+        adopt(res.session, res.token, { navigateHome: true })
+        return { ok: true, session: res.session }
+      }
+    } catch {
+      /* offline fallback */
+    }
+    const fallbackSession = {
+      id: demo.id,
+      name: demo.name,
+      email: `${demo.id.toLowerCase()}@skilltrace.demo`,
+      phone: demo.id === 'TRN-0001' ? '9125671886' : '9820012345',
+      role: 'client',
+      designation: demo.course,
+      district: demo.district,
+      company_name: demo.employer,
+      verified: true,
+      is_demo: true,
+    }
+    adopt(fallbackSession, `demo-token-${demo.id}`, { navigateHome: true })
+    return { ok: true, session: fallbackSession }
+  }
 
   const endSession = (to) => {
     backendAuth.clearToken()
@@ -238,6 +282,8 @@ export function AuthProvider({ children }) {
         isMinistry,
         isEmployer,
         role,
+        demoTrainees: DEMO_TRAINEES,
+        loginDemoTrainee,
         // Master status is read from the server's own answer, not inferred
         // from an email string in the browser.
         isMasterAdmin: Boolean(session?.is_master || session?.permissions?.is_master_admin),

@@ -127,7 +127,7 @@ def seed_database():
             verified=True,
             last_login="2026-09-10 09:30 IST",
         ),
-        # Citizen / Trainee (Restricted to own record)
+        # Citizen / Trainee 1 (Employed & Verified)
         User(
             id="TRN-0001",
             name="Aarti Patil",
@@ -139,6 +139,19 @@ def seed_database():
             hashed_password=hash_password("User@2026Password"),
             verified=True,
             last_login="2026-09-10 10:15 IST",
+        ),
+        # Citizen / Trainee 2 (Employment Follow-up / Awaiting Confirmation)
+        User(
+            id="TRN-0004",
+            name="Rahul Sharma",
+            email="rahul.sharma@skilltrace.demo",
+            phone="9820012345",
+            role="client",
+            designation="Certified Solar Technician",
+            company_name="GreenVolt Solar Solutions",
+            hashed_password=hash_password("User@2026Password"),
+            verified=True,
+            last_login="2026-09-11 11:00 IST",
         ),
         # Employer (Restricted to their company's trainees)
         User(

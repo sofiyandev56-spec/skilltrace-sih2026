@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext.jsx'
 import { COURSES, DISTRICTS, CATEGORIES } from '../api/mock/dataset.js'
+import DemoTraineeCards from './DemoTraineeCards.jsx'
 
 export default function AuthModal() {
   const navigate = useNavigate()
@@ -140,6 +141,12 @@ export default function AuthModal() {
               </div>
 
               <div className="auth-options">
+                <DemoTraineeCards onSelect={closeLogin} />
+
+                <div className="auth-divider">
+                  <span>OR REGULAR SIGN IN</span>
+                </div>
+
                 {/* Option A: Google */}
                 <button
                   type="button"

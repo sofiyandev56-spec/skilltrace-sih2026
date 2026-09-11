@@ -73,11 +73,14 @@ export default function GovTopbar() {
               className="gov-contrast-btn"
               aria-pressed={contrast === 'high'}
               onClick={() => setContrast(contrast === 'high' ? 'standard' : 'high')}
+              title={contrast === 'high' ? t('standardContrast') : t('highContrast')}
             >
               <span className="gov-contrast-btn__icon" aria-hidden="true">
                 ◐
               </span>
-              {contrast === 'high' ? t('standardContrast') : t('highContrast')}
+              <span className="gov-contrast-btn__label">
+                {contrast === 'high' ? t('standardContrast') : t('highContrast')}
+              </span>
             </button>
 
             <div className="gov-lang-switch" role="group" aria-label={t('language')}>

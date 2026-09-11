@@ -2,6 +2,7 @@ import React from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext.jsx'
 import { useGov } from '../gov/GovContext.jsx'
+import DemoTraineeCards from './DemoTraineeCards.jsx'
 
 /**
  * Route guards for the two interfaces.
@@ -95,6 +96,10 @@ export function ClientRoute({ children }) {
           >
             {t('guardSignIn')}
           </button>
+        </div>
+
+        <div style={{ marginTop: 24, textAlign: 'left' }}>
+          <DemoTraineeCards />
         </div>
       </div>
     </div>

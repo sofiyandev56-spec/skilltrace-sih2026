@@ -5,6 +5,7 @@ import { useApi } from '../lib/useApi.js'
 import { int, longDate, pct } from '../lib/format.js'
 import { BUCKET_META } from '../lib/evidence.js'
 import { useGov } from '../gov/GovContext.jsx'
+import { useAuth } from '../auth/AuthContext.jsx'
 
 /** Snapshot of the figures a withdrawal is about to move. */
 async function figures() {
@@ -19,6 +20,7 @@ async function figures() {
 
 export default function Consent() {
   const { t, lang } = useGov()
+  const { user, isMinistry } = useAuth()
   const navigate = useNavigate()
   const [traineeId, setTraineeId] = useState('')
   const [step, setStep] = useState('idle') // idle | confirming | working | done
@@ -30,15 +32,20 @@ export default function Consent() {
     [traineeId, step],
   )
 
-  /* Default to someone whose withdrawal visibly moves the employment figure. */
+  /* Default to logged in trainee or someone whose withdrawal visibly moves the employment figure. */
   useEffect(() => {
-    if (traineeId || !people.data?.length) return
+    if (traineeId) return
+    if (!isMinistry && user?.id) {
+      setTraineeId(user.id)
+      return
+    }
+    if (!people.data?.length) return
     const good =
       people.data.find((p) => p.outcome === 'employed' && p.trust_level === 'high') ||
       people.data.find((p) => p.outcome === 'employed') ||
       people.data[0]
     setTraineeId(good.id)
-  }, [people.data, traineeId])
+  }, [people.data, traineeId, user, isMinistry])
 
   const options = useMemo(() => (people.data || []).slice(0, 120), [people.data])
   const c = consent.data
