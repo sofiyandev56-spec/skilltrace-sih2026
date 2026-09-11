@@ -945,147 +945,197 @@ def get_dashboard(
     trainees = query.all()
     total = len(trainees)
 
-    # Buckets
-    buckets = {
-        "employed": 0,
-        "self_employed": 0,
-        "apprentice": 0,
-        "not_working": 0,
-        "awaiting_confirmation": 0,
-        "no_data": 0
-    }
-    tier_counts = {
-        "high": 0,
-        "medium": 0,
-        "low": 0,
-        "stale": 0
-    }
+    # ------------------------------------------------------------------
+    # Every figure below is computed from the rows that survived the filter.
+    # This handler used to return constants for retention, wage progression
+    # and every evidence tier — 79.4% retained, a wage table with invented
+    # cohorts — regardless of what was selected. A dashboard whose charts do
+    # not move when its filters do is not a dashboard.
+    # ------------------------------------------------------------------
+    ids = [t.id for t in trainees]
+    events_by = {}
+    if ids:
+        for e in db.query(Event).filter(Event.trainee_id.in_(ids)).order_by(Event.date).all():
+            events_by.setdefault(e.trainee_id, []).append(e)
 
+    def days_between(a: str, b: str) -> int:
+        try:
+            return (datetime.fromisoformat(b[:10]) - datetime.fromisoformat(a[:10])).days
+        except Exception:
+            return 0
+
+    def classify(evs):
+        """Mirror of the frontend rule: a placement is employment only once a
+        still_working confirmation at the same employer follows it 75+ days on."""
+        if not evs:
+            return "no_data", "stale", None
+        last = evs[-1]
+        if last.what_happened == "still_working":
+            placement = next(
+                (e for e in reversed(evs) if e.what_happened == "placed" and e.employer == last.employer),
+                None,
+            )
+            if placement and days_between(placement.date, last.date) >= 75:
+                return "employed", last.trust_level, last
+            return "awaiting_confirmation", last.trust_level, last
+        if last.what_happened == "placed":
+            return "awaiting_confirmation", last.trust_level, last
+        if last.what_happened == "self_employed":
+            return "self_employed", last.trust_level, last
+        if last.what_happened == "apprentice":
+            return "apprentice", last.trust_level, last
+        return "not_working", last.trust_level, last
+
+    def empty_tiers():
+        return {"high": 0, "medium": 0, "low": 0, "stale": 0}
+
+    def tier_pct(tiers):
+        n = sum(tiers.values())
+        if not n:
+            return {"high": 0, "medium": 0, "low": 0, "stale": 0, "total": 0}
+        return {k: round(v / n * 100) for k, v in tiers.items()} | {"total": n}
+
+    def pct(n, d):
+        return round(n / d * 1000) / 10 if d else 0
+
+    bucket_names = ["employed", "self_employed", "apprentice", "not_working", "awaiting_confirmation", "no_data"]
+    counts = {b: 0 for b in bucket_names}
+    tiers = {b: empty_tiers() for b in bucket_names}
+    overall = empty_tiers()
     ever_placed = 0
+
     for t in trainees:
-        outc = t.outcome or "awaiting_confirmation"
-        if outc in buckets:
-            buckets[outc] += 1
-        else:
-            buckets["awaiting_confirmation"] += 1
-
-        t_lvl = t.trust_level or "medium"
-        if t_lvl in tier_counts:
-            tier_counts[t_lvl] += 1
-
-        if t.placement_date or outc == "employed":
+        evs = events_by.get(t.id, [])
+        bucket, trust, ev = classify(evs)
+        counts[bucket] += 1
+        if trust in tiers[bucket]:
+            tiers[bucket][trust] += 1
+        if ev is not None and trust in overall:
+            overall[trust] += 1
+        if any(e.what_happened == "placed" for e in evs):
             ever_placed += 1
 
-    headline_placement_pct = round((ever_placed / total * 100), 1) if total else 0.0
+    outcomes_res = {
+        b: {"count": counts[b], "pct": pct(counts[b], total), "evidence": tier_pct(tiers[b])}
+        for b in bucket_names
+    }
 
-    outcomes_res = {}
-    for b_key, b_count in buckets.items():
-        pct = round((b_count / total * 100), 1) if total else 0.0
-        outcomes_res[b_key] = {
-            "count": b_count,
-            "pct": pct,
-            "evidence": {
-                "high": 60 if b_key == "employed" else 20,
-                "medium": 30 if b_key == "employed" else 50,
-                "low": 10 if b_key == "employed" else 30,
-                "stale": 0,
-                "total": b_count
-            }
-        }
+    # Retention at 3 / 6 / 12 months, among those whose checkpoint has come.
+    as_of = "2026-09-10"
+    retention_res = []
+    for offset, label, months in ((90, "3 months", 3), (180, "6 months", 6), (365, "12 months", 12)):
+        eligible = retained = 0
+        rt = empty_tiers()
+        for t in trainees:
+            evs = events_by.get(t.id, [])
+            placement = next((e for e in evs if e.what_happened == "placed"), None)
+            if not placement or days_between(placement.date, as_of) < offset:
+                continue
+            eligible += 1
+            hit = next(
+                (e for e in evs
+                 if e.what_happened == "still_working"
+                 and e.employer == placement.employer
+                 and days_between(placement.date, e.date) >= offset - 15),
+                None,
+            )
+            if hit:
+                retained += 1
+                if hit.trust_level in rt:
+                    rt[hit.trust_level] += 1
+        retention_res.append({
+            "checkpoint": label,
+            "months": months,
+            "pct": pct(retained, eligible) if eligible else None,
+            "eligible": eligible,
+            "retained": retained,
+            "evidence": tier_pct(rt),
+        })
 
-    # Retention
-    retention_res = [
-        {
-            "checkpoint": "3 months",
-            "months": 3,
-            "pct": 79.4 if total else 0,
-            "eligible": total,
-            "retained": int(total * 0.794) if total else 0,
-            "evidence": {"high": 65, "medium": 25, "low": 10, "stale": 0, "total": total}
-        },
-        {
-            "checkpoint": "6 months",
-            "months": 6,
-            "pct": 72.1 if total else 0,
-            "eligible": total,
-            "retained": int(total * 0.721) if total else 0,
-            "evidence": {"high": 58, "medium": 30, "low": 12, "stale": 0, "total": total}
-        },
-        {
-            "checkpoint": "12 months",
-            "months": 12,
-            "pct": 66.8 if total else 0,
-            "eligible": total,
-            "retained": int(total * 0.668) if total else 0,
-            "evidence": {"high": 50, "medium": 35, "low": 15, "stale": 0, "total": total}
-        },
-    ]
+    # Wage progression: mean salary per cohort at each checkpoint after placement.
+    cohorts_present = sorted({t.cohort for t in trainees if t.cohort})
+    windows = [(0, -999, 45), (3, 46, 135), (6, 136, 270), (12, 271, 9999)]
+    wage_tiers = empty_tiers()
+    wage_progression = []
+    by_cohort = {}
+    for t in trainees:
+        by_cohort.setdefault(t.cohort, []).append(t)
+    for months, lo, hi in windows:
+        row = {"months": months, "label": "At placement" if months == 0 else f"{months} mo"}
+        for c in cohorts_present:
+            salaries = []
+            for t in by_cohort.get(c, []):
+                evs = events_by.get(t.id, [])
+                placement = next((e for e in evs if e.what_happened == "placed"), None)
+                if not placement:
+                    continue
+                for e in evs:
+                    if not e.salary or e.what_happened not in ("placed", "still_working"):
+                        continue
+                    d = days_between(placement.date, e.date)
+                    if lo <= d <= hi:
+                        salaries.append(e.salary)
+                        if e.trust_level in wage_tiers:
+                            wage_tiers[e.trust_level] += 1
+            row[c] = round(sum(salaries) / len(salaries)) if salaries else None
+        wage_progression.append(row)
 
-    wage_progression = [
-        {"months": 0, "label": "At placement", "2025-Q1": 14500, "2025-Q2": 15200, "2025-Q3": 15800},
-        {"months": 3, "label": "3 mo", "2025-Q1": 15600, "2025-Q2": 16100, "2025-Q3": 16700},
-        {"months": 6, "label": "6 mo", "2025-Q1": 17200, "2025-Q2": 17800, "2025-Q3": None},
-        {"months": 12, "label": "12 mo", "2025-Q1": 19400, "2025-Q2": None, "2025-Q3": None},
-    ]
-
-    total_consents = db.query(Consent).count()
-    granted_consents = db.query(Consent).filter(Consent.granted == True).count()
-
-    # The funnel the dashboard draws. Each stage is a share of everyone
-    # certified, not of the stage before it, so the largest fall is the place
-    # the programme is actually losing people. "Contacted" counts only people
-    # who answered for themselves — an employer or bank signal is evidence
-    # about someone, not contact with them.
-    scope_ids = [t.id for t in trainees]
-    all_events = db.query(Event).filter(Event.trainee_id.in_(scope_ids)).all() if scope_ids else []
-    contacted = len({
-        e.trainee_id for e in all_events if e.source in ("trainee", "field_officer", "whatsapp")
-    })
-    placed_ids = {e.trainee_id for e in all_events if e.what_happened == "placed"}
-    retained_ids = {e.trainee_id for e in all_events if e.what_happened == "still_working"}
-    course_by_id = {t.id: t.course for t in trainees}
-    role_matched = len({
-        e.trainee_id for e in all_events
-        if e.trainee_id in retained_ids and e.job_role and e.job_role == course_by_id.get(e.trainee_id)
-    })
-
-    def _pct(n):
-        return round(n / total * 1000) / 10 if total else 0
+    # The drop-off funnel. "Contacted" counts only people who answered for
+    # themselves — an employer or bank signal is evidence about someone, not
+    # contact with them.
+    course_role = {}
+    for t in trainees:
+        course_role.setdefault(t.course, t.course)
+    contacted = retained3 = role_matched = 0
+    for t in trainees:
+        evs = events_by.get(t.id, [])
+        if any(e.source in ("trainee", "field_officer", "whatsapp") for e in evs):
+            contacted += 1
+        bucket, _, ev = classify(evs)
+        if bucket == "employed":
+            retained3 += 1
+            if ev is not None and ev.job_role and ev.job_role == t.course:
+                role_matched += 1
 
     funnel = [
-        {"stage": "Certified", "count": total, "note": "Completed training and assessed", "pct": 100 if total else 0},
-        {"stage": "Contacted", "count": contacted, "note": "Responded to at least one check-in", "pct": _pct(contacted)},
-        {"stage": "Employed", "count": len(placed_ids), "note": "Reported a placement", "pct": _pct(len(placed_ids))},
-        {"stage": "Retained 3 months", "count": len(retained_ids), "note": "Same employer 3+ months on", "pct": _pct(len(retained_ids))},
-        {"stage": "Role-matched", "count": role_matched, "note": "Working in the trained occupation", "pct": _pct(role_matched)},
+        {"stage": "Certified", "count": total, "note": "Completed training and assessed"},
+        {"stage": "Contacted", "count": contacted, "note": "Responded to at least one check-in"},
+        {"stage": "Employed", "count": ever_placed, "note": "Reported a placement"},
+        {"stage": "Retained 3 months", "count": retained3, "note": "Same employer 3+ months on"},
+        {"stage": "Role-matched", "count": role_matched, "note": "Working in the trained occupation"},
     ]
+    for f in funnel:
+        f["pct"] = pct(f["count"], total)
+
+    consent_ids = set(ids)
+    total_consents = db.query(Consent).filter(Consent.trainee_id.in_(ids)).count() if ids else 0
+    granted_consents = (
+        db.query(Consent).filter(Consent.trainee_id.in_(ids), Consent.granted == True).count() if ids else 0
+    )
 
     return {
-        "as_of": "2026-09-10",
+        "as_of": as_of,
         "filters_applied": {"cohort": cohort, "course": course, "provider": provider, "district": district},
         "total_trainees": total,
-        "headline_placement_pct": headline_placement_pct,
+        "headline_placement_pct": pct(ever_placed, total),
         "headline_placement_count": ever_placed,
         "outcomes": outcomes_res,
         "retention": retention_res,
-        "wage_progression": wage_progression,
-        "wage_evidence": {"high": 60, "medium": 30, "low": 10, "stale": 0, "total": total},
         "funnel": funnel,
-        "event_count": len(all_events),
-        "cohorts_present": ["2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4"],
-        "evidence_totals": {
-            "high": 55, "medium": 32, "low": 13, "stale": 0, "total": total
-        },
+        "event_count": sum(len(v) for v in events_by.values()),
+        "wage_progression": wage_progression,
+        "wage_evidence": tier_pct(wage_tiers),
+        "cohorts_present": cohorts_present,
+        "evidence_totals": tier_pct(overall),
+        # Keys as the privacy strip reads them: how many are counted, how many
+        # withdrew and are therefore absent from every figure above.
         "consent": {
             "total": total_consents,
-            "active": granted_consents,
-            "withdrawn": total_consents - granted_consents
-        }
+            "included": granted_consents,
+            "withdrawn": total_consents - granted_consents,
+        },
     }
 
-# -------------------------------------------------------------------
-# Providers & Skill Gap
-# -------------------------------------------------------------------
 @app.get("/providers")
 def get_providers(
     district: Optional[str] = None,
@@ -1233,6 +1283,7 @@ def get_attention(db: Session = Depends(get_db)):
 @app.get("/audit")
 def get_audit(
     source: Optional[str] = None,
+    district: Optional[str] = None,
     limit: int = Query(150, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
@@ -1240,9 +1291,13 @@ def get_audit(
     q = db.query(Event)
     if source:
         q = q.filter(Event.source == source)
+    if district:
+        q = q.join(Trainee, Trainee.id == Event.trainee_id).filter(Trainee.district == district)
     rows = q.order_by(Event.date.desc()).limit(limit).all()
     return {
-        "event_count": db.query(Event).count(),
+        # The count reflects the same filter as the rows, so "150 of 32,008"
+        # never appears beside a district that holds 1,300.
+        "event_count": q.count(),
         "events": [
             {
                 "id": e.id,
@@ -1534,10 +1589,16 @@ def verify_milestone(
 # -------------------------------------------------------------------
 @app.get("/disputes")
 def get_disputes(
+    district: Optional[str] = None,
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     disputes = db.query(Dispute).all()
+    # A district officer's console sends their district on every call; the
+    # badge and the list must count the same people the dashboard does.
+    if district:
+        in_district = {t.id for t in db.query(Trainee.id).filter(Trainee.district == district).all()}
+        disputes = [d for d in disputes if d.trainee_id in in_district]
     # Filter if employer
     if current_user and current_user.role == "employer":
         # Only show disputes for company candidates
@@ -1803,7 +1864,9 @@ _followup_queue: List[Dict[str, Any]] = _load_followup_queue()
 
 
 @app.get("/followup-queue")
-def get_followup_queue():
+def get_followup_queue(district: Optional[str] = None):
+    if district:
+        return [r for r in _followup_queue if r.get("district") == district]
     return _followup_queue
 
 
