@@ -287,8 +287,135 @@ def seed_database():
         db.add(r)
 
     db.commit()
+    seed_national_dataset(db)
     db.close()
     print("SkillTrace database successfully seeded with multi-role accounts and national registry records!")
 
 if __name__ == "__main__":
     seed_database()
+
+
+# Path to the national dataset the frontend also ships. Kept as a single
+# source so the API and the offline fallback describe the same 15,000 people.
+_DATASET_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..", "frontend", "src", "api", "mock", "data", "organized_data.json",
+)
+
+
+def seed_national_dataset(db):
+    """
+    Load the 15,000-trainee national dataset into the database.
+
+    The hand-written seed above covers eleven trainees in six districts. The
+    ten issued Officer IDs are posted to eight districts, three of which had
+    no rows at all, so a district officer opened on an empty dashboard and
+    "All districts" showed eleven people. This loads the same dataset the
+    frontend carries, so every district and every figure is populated, and
+    the API and the offline fallback agree.
+
+    Runs once: skipped whenever the table already holds the dataset.
+    """
+    if db.query(Trainee).count() >= 1000:
+        return
+    if not os.path.exists(_DATASET_PATH):
+        print(f"National dataset not found at {_DATASET_PATH}; skipping.")
+        return
+
+    with open(_DATASET_PATH, encoding="utf-8") as fh:
+        data = json.load(fh)
+
+    existing_trainees = {t.id for t in db.query(Trainee.id).all()}
+    existing_events = {e.id for e in db.query(Event.id).all()}
+    existing_disputes = {d.id for d in db.query(Dispute.id).all()}
+    existing_consents = {c.id for c in db.query(Consent.id).all()}
+
+    # Outcome per trainee, derived the way the frontend does it: the last
+    # event decides, and a placement is only employment once a still_working
+    # confirmation follows it.
+    latest = {}
+    placed_on = {}
+    for ev in data.get("events", []):
+        cur = latest.get(ev["trainee_id"])
+        if cur is None or ev["date"] >= cur["date"]:
+            latest[ev["trainee_id"]] = ev
+        if ev["what_happened"] == "placed" and ev["trainee_id"] not in placed_on:
+            placed_on[ev["trainee_id"]] = ev["date"]
+
+    outcome_of = {
+        "still_working": "employed",
+        "placed": "awaiting_confirmation",
+        "self_employed": "self_employed",
+        "apprentice": "apprentice",
+        "left_job": "not_working",
+        "not_working": "not_working",
+    }
+
+    added = 0
+    for t in data.get("trainees", []):
+        if t["id"] in existing_trainees:
+            continue
+        last = latest.get(t["id"])
+        db.add(Trainee(
+            id=t["id"],
+            name=t["name"],
+            course=t["course"],
+            district=t["district"],
+            gender=t.get("gender", "Other"),
+            age_group=t.get("age_group", "25-34"),
+            category=t.get("category", "General"),
+            phone=t.get("phone", ""),
+            cohort=t.get("cohort", ""),
+            provider_id=t.get("provider_id", ""),
+            employer=(last or {}).get("employer"),
+            salary=(last or {}).get("salary"),
+            outcome=outcome_of.get((last or {}).get("what_happened"), "no_data"),
+            trust_level=(last or {}).get("trust_level", "stale"),
+            certification_date=None,
+            placement_date=placed_on.get(t["id"]),
+        ))
+        added += 1
+        if added % 2000 == 0:
+            db.flush()
+
+    for ev in data.get("events", []):
+        if ev["id"] in existing_events:
+            continue
+        db.add(Event(
+            id=ev["id"],
+            trainee_id=ev["trainee_id"],
+            date=ev["date"],
+            what_happened=ev["what_happened"],
+            job_role=ev.get("job_role"),
+            employer=ev.get("employer"),
+            salary=ev.get("salary"),
+            source=ev.get("source", "trainee"),
+            trust_level=ev.get("trust_level", "low"),
+        ))
+
+    for d in data.get("disputes", []):
+        if d["id"] in existing_disputes:
+            continue
+        db.add(Dispute(
+            id=d["id"],
+            trainee_id=d["trainee_id"],
+            employer_claim=d.get("employer_claim", ""),
+            trainee_claim=d.get("trainee_claim", ""),
+            date=d.get("date", ""),
+            status=d.get("status", "open"),
+            assigned_officer=d.get("assigned_officer_id"),
+        ))
+
+    for c in data.get("consents", []):
+        if c["id"] in existing_consents:
+            continue
+        db.add(Consent(
+            id=c["id"],
+            trainee_id=c["trainee_id"],
+            purpose=", ".join(c.get("scopes", [])) or "outcome tracking",
+            granted=(c.get("status", "active") == "active"),
+            date=c.get("granted_date") or c.get("withdrawn_date") or "",
+        ))
+
+    db.commit()
+    print(f"National dataset loaded: {added} trainees added.")

@@ -1777,38 +1777,49 @@ def post_checkin(body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)
 
     return {"status": "checkin_recorded", "id": chk.id, "event_id": new_evt.id}
 
-@app.get("/followup-queue")
-def get_followup_queue(db: Session = Depends(get_db)):
-    return [
-        {
-            "trainee_id": "TRN-0004",
-            "name": "Suresh Shinde",
-            "phone": "+91 98111 22334",
-            "course": "Solar Technician",
-            "district": "Thane",
-            "provider_id": "PRV-001",
-            "reason": "Milestone due (day 88) — awaiting second verification",
-            "due_date": "2026-09-12",
-            "priority": "high",
-            "assigned_officer": "Rajesh Patel"
-        },
-        {
-            "trainee_id": "TRN-0006",
-            "name": "Amit Jadhav",
-            "phone": "+91 98777 88990",
-            "course": "Automobile Technician",
-            "district": "Pune",
-            "provider_id": "PRV-003",
-            "reason": "Wage mismatch flagged during employer checkin",
-            "due_date": "2026-09-15",
-            "priority": "medium",
-            "assigned_officer": "Sunita Kulkarni"
-        }
-    ]
+# The follow-up queue from the national dataset — trainees unreachable after
+# repeated attempts. Held in memory: it is a work list that officers assign
+# from, not a ledger, and the two literal rows this used to return did not
+# even use the field names the page reads.
+_FOLLOWUP_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..", "frontend", "src", "api", "mock", "data", "organized_data.json",
+)
 
-# -------------------------------------------------------------------
-# WhatsApp Automated 3-Month Status Surveys (Whapi.cloud)
-# -------------------------------------------------------------------
+
+def _load_followup_queue() -> List[Dict[str, Any]]:
+    try:
+        with open(_FOLLOWUP_PATH, encoding="utf-8") as fh:
+            rows = json.load(fh).get("followupQueue", [])
+    except Exception:
+        rows = []
+    for r in rows:
+        r.setdefault("assigned_to", None)
+        r.setdefault("assigned_at", None)
+    return rows
+
+
+_followup_queue: List[Dict[str, Any]] = _load_followup_queue()
+
+
+@app.get("/followup-queue")
+def get_followup_queue():
+    return _followup_queue
+
+
+class AssignFollowupRequest(BaseModel):
+    officer: Optional[str] = None
+
+
+@app.post("/followup-queue/{trainee_id}/assign")
+def assign_followup(trainee_id: str, payload: AssignFollowupRequest):
+    for r in _followup_queue:
+        if r.get("trainee_id") == trainee_id:
+            r["assigned_to"] = payload.officer
+            r["assigned_at"] = datetime.utcnow().strftime("%Y-%m-%d") if payload.officer else None
+            return r
+    raise HTTPException(status_code=404, detail="Trainee is not in the follow-up queue.")
+
 @app.post("/api/whatsapp/send-survey")
 def send_whatsapp_survey_api(payload: WhatsAppSendRequest, db: Session = Depends(get_db)):
     t_name = payload.trainee_name or "Trainee"
