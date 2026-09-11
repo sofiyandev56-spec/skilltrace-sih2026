@@ -416,6 +416,137 @@ FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 MASTER_GOV_EMAIL = "shlok.borad11@gmail.com"
 
 
+# ---- shared analytics helpers ----------------------------------------
+# These mirror the frontend's offline computation so the API and the fallback
+# can never disagree about what a figure means.
+
+AS_OF = "2026-09-10"
+
+# Quick Review option values, scored as lib/review.js scores them (1-4).
+_REVIEW_SCORES = {
+    "excellent": 4, "good": 3, "average": 2, "poor": 1,
+    "very_useful": 4, "useful": 3, "somewhat": 2, "not_useful": 1,
+    "very_confident": 4, "confident": 3, "somewhat_confident": 2, "not_confident": 1,
+    "definitely": 4, "probably": 3, "maybe": 2, "no": 1,
+}
+_REVIEW_QUESTIONS = [
+    ("overall_quality", "overall_quality", ["excellent", "good", "average", "poor"]),
+    ("job_usefulness", "job_usefulness", ["very_useful", "useful", "somewhat", "not_useful"]),
+    ("trainer_rating", "trainer_score", ["excellent", "good", "average", "poor"]),
+    ("confidence", "skill_confidence", ["very_confident", "confident", "somewhat_confident", "not_confident"]),
+    ("recommend", "would_recommend", ["definitely", "probably", "maybe", "no"]),
+]
+
+
+def _days_between(a: str, b: str) -> int:
+    try:
+        return (datetime.fromisoformat(str(b)[:10]) - datetime.fromisoformat(str(a)[:10])).days
+    except Exception:
+        return 0
+
+
+def _classify(evs):
+    """A placement is employment only once a still_working confirmation at the
+    same employer follows it 75+ days on. Returns (bucket, trust, last_event)."""
+    if not evs:
+        return "no_data", "stale", None
+    last = evs[-1]
+    if last.what_happened == "still_working":
+        placement = next(
+            (e for e in reversed(evs) if e.what_happened == "placed" and e.employer == last.employer),
+            None,
+        )
+        if placement and _days_between(placement.date, last.date) >= 75:
+            return "employed", last.trust_level, last
+        return "awaiting_confirmation", last.trust_level, last
+    if last.what_happened == "placed":
+        return "awaiting_confirmation", last.trust_level, last
+    if last.what_happened == "self_employed":
+        return "self_employed", last.trust_level, last
+    if last.what_happened == "apprentice":
+        return "apprentice", last.trust_level, last
+    return "not_working", last.trust_level, last
+
+
+def _empty_tiers():
+    return {"high": 0, "medium": 0, "low": 0, "stale": 0}
+
+
+def _tier_pct(tiers):
+    n = sum(tiers.values())
+    if not n:
+        return {"high": 0, "medium": 0, "low": 0, "stale": 0, "total": 0}
+    return {k: round(v / n * 100) for k, v in tiers.items()} | {"total": n}
+
+
+def _events_by_trainee(db: Session, ids):
+    out = {}
+    if not ids:
+        return out
+    for e in db.query(Event).filter(Event.trainee_id.in_(ids)).order_by(Event.date).all():
+        out.setdefault(e.trainee_id, []).append(e)
+    return out
+
+
+def _retention_at(own, events_by, offset):
+    """Share retained at a checkpoint, among those whose checkpoint has come."""
+    eligible = retained = 0
+    for t in own:
+        evs = events_by.get(t.id, [])
+        placement = next((e for e in evs if e.what_happened == "placed"), None)
+        if not placement or _days_between(placement.date, AS_OF) < offset:
+            continue
+        eligible += 1
+        if any(
+            e.what_happened == "still_working"
+            and e.employer == placement.employer
+            and _days_between(placement.date, e.date) >= offset - 15
+            for e in evs
+        ):
+            retained += 1
+    return round(retained / eligible * 100) if eligible else None
+
+
+# Course definitions and the district list, from the same dataset the seed
+# loads, so the skill-gap chart names the roles the courses actually train for.
+def _dataset_meta():
+    try:
+        with open(_FOLLOWUP_PATH, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d.get("courses", []), d.get("districts", [])
+    except Exception:
+        return [], []
+
+
+_COURSES, _DISTRICTS = [], []
+
+
+def _meta():
+    global _COURSES, _DISTRICTS
+    if not _COURSES:
+        _COURSES, _DISTRICTS = _dataset_meta()
+    return _COURSES, _DISTRICTS
+
+
+def _filtered_trainees(db, cohort=None, course=None, provider=None, district=None, demographic=None):
+    q = db.query(Trainee)
+    if cohort:
+        q = q.filter(Trainee.cohort == cohort)
+    if course:
+        q = q.filter(Trainee.course == course)
+    if provider:
+        q = q.filter(Trainee.provider_id == provider)
+    if district:
+        q = q.filter(Trainee.district == district)
+    if demographic and ":" in demographic:
+        key, val = demographic.split(":", 1)
+        col = {"gender": Trainee.gender, "age_group": Trainee.age_group, "category": Trainee.category}.get(key)
+        if col is not None:
+            q = q.filter(col == val)
+    withdrawn = withdrawn_trainee_ids(db)
+    return [t for t in q.all() if t.id not in withdrawn]
+
+
 def withdrawn_trainee_ids(db: Session) -> set:
     """
     Trainees who have withdrawn consent under the DPDPA.
@@ -1151,13 +1282,67 @@ def get_dashboard(
 
 @app.get("/providers")
 def get_providers(
+    cohort: Optional[str] = None,
+    course: Optional[str] = None,
+    provider: Optional[str] = None,
     district: Optional[str] = None,
-    db: Session = Depends(get_db)
+    demographic: Optional[str] = None,
+    db: Session = Depends(get_db),
 ):
-    q = db.query(Provider)
-    if district:
-        q = q.filter(Provider.district == district)
-    return q.all()
+    """
+    The centre league table, computed from the trainees each centre certified.
+
+    The Provider rows carry seeded constants — certified_count=420 and a
+    verified_placement_pct chosen by hand — which were served as-is while the
+    dataset held 15,000 real records. Every column now comes from those
+    records, and the table narrows with the same filters as the dashboard.
+    """
+    cohort_rows = _filtered_trainees(db, cohort, course, provider, district, demographic)
+    by_provider = {}
+    for t in cohort_rows:
+        by_provider.setdefault(t.provider_id, []).append(t)
+    events_by = _events_by_trainee(db, [t.id for t in cohort_rows])
+    courses, _ = _meta()
+    intended = {c["name"]: c.get("intended_role") for c in courses}
+
+    out = []
+    for p in db.query(Provider).all():
+        own = by_provider.get(p.id)
+        if not own:
+            continue
+        tiers = _empty_tiers()
+        verified = role_matched = placed_ever = stale = 0
+        for t in own:
+            evs = events_by.get(t.id, [])
+            if any(e.what_happened == "placed" for e in evs):
+                placed_ever += 1
+            bucket, trust, ev = _classify(evs)
+            if trust == "stale":
+                stale += 1
+            if bucket == "employed":
+                verified += 1
+                if trust in tiers:
+                    tiers[trust] += 1
+                if ev is not None and ev.job_role and ev.job_role == intended.get(t.course):
+                    role_matched += 1
+        share = lambda n: round(n / len(own) * 100) if own else 0
+        reported, verified_pct = share(placed_ever), share(verified)
+        out.append({
+            "id": p.id,
+            "name": p.name,
+            "district": p.district,
+            "certified_count": len(own),
+            "headline_placement_pct": reported,
+            "verified_placement_pct": verified_pct,
+            "proof_gap": reported - verified_pct,
+            "role_match_pct": share(role_matched),
+            "stale_pct": share(stale),
+            "retention_3mo": _retention_at(own, events_by, 90),
+            "retention_6mo": _retention_at(own, events_by, 180),
+            "retention_12mo": _retention_at(own, events_by, 365),
+            "evidence": _tier_pct(tiers),
+        })
+    return out
 
 @app.get("/providers/{provider_id}")
 def get_provider_detail(provider_id: str, db: Session = Depends(get_db)):
@@ -1336,55 +1521,76 @@ def get_audit(
 
 @app.get("/skill-gap")
 def get_skill_gap(
+    cohort: Optional[str] = None,
+    course: Optional[str] = None,
+    provider: Optional[str] = None,
     district: Optional[str] = None,
-    db: Session = Depends(get_db)
+    demographic: Optional[str] = None,
+    db: Session = Depends(get_db),
 ):
-    return [
-        {
-            "course": "Healthcare Assistant",
-            "trained": 420,
-            "aligned_placements": 330,
-            "drift_placements": 45,
-            "alignment_rate": 78.5,
-            "unmet_demand": 120,
-            "primary_drift_role": "Hospital Front Desk Receptionist",
-            "status": "high_demand"
-        },
-        {
-            "course": "CNC Operator",
-            "trained": 380,
-            "aligned_placements": 290,
-            "drift_placements": 50,
-            "alignment_rate": 76.3,
-            "unmet_demand": 85,
-            "primary_drift_role": "Assembly Line Helper",
-            "status": "balanced"
-        },
-        {
-            "course": "Solar Technician",
-            "trained": 290,
-            "aligned_placements": 210,
-            "drift_placements": 40,
-            "alignment_rate": 72.4,
-            "unmet_demand": 95,
-            "primary_drift_role": "Domestic Electrician",
-            "status": "growing"
-        },
-        {
-            "course": "Python Development",
-            "trained": 240,
-            "aligned_placements": 195,
-            "drift_placements": 25,
-            "alignment_rate": 81.2,
-            "unmet_demand": 60,
-            "primary_drift_role": "IT Support Executive",
-            "status": "high_demand"
-        },
-    ]
+    """Intended role versus the role people are actually working in, per course
+    and per district. Was a fixed list of four courses with invented counts."""
+    rows = _filtered_trainees(db, cohort, course, provider, district, demographic)
+    events_by = _events_by_trainee(db, [t.id for t in rows])
+    courses_def, districts = _meta()
+    working_buckets = {"employed", "awaiting_confirmation", "apprentice", "self_employed"}
 
-# -------------------------------------------------------------------
-# Trainees (Role-Restricted DPDPA 2023 Compliant)
-# -------------------------------------------------------------------
+    gap_tiers = _empty_tiers()
+    course_rows = []
+    for d in courses_def:
+        own = [t for t in rows if t.course == d["name"]]
+        if not own:
+            continue
+        working = on_role = 0
+        for t in own:
+            bucket, trust, ev = _classify(events_by.get(t.id, []))
+            if bucket not in working_buckets:
+                continue
+            working += 1
+            if trust in gap_tiers:
+                gap_tiers[trust] += 1
+            role = (ev.job_role if ev is not None else "") or ""
+            ir = d.get("intended_role")
+            if role in (ir, f"Apprentice — {ir}", f"Self-employed — {ir}"):
+                on_role += 1
+        actual = round(on_role / len(own) * 100)
+        target = int(d.get("target_pct", 0))
+        course_rows.append({
+            "course": d["name"],
+            "intended_role": d.get("intended_role"),
+            "intended_pct": target,
+            "actual_pct": actual,
+            "mismatch": max(0, target - actual),
+            "trainees": len(own),
+            "working": working,
+        })
+    mismatch_of = {c["course"]: c["mismatch"] for c in course_rows}
+
+    district_rows = []
+    for name in districts:
+        own = [t for t in rows if t.district == name]
+        if not own:
+            district_rows.append({"district": name, "mismatch": None, "trainees": 0, "top_gap_course": None})
+            continue
+        weighted = 0
+        worst = None
+        for d in courses_def:
+            n = sum(1 for t in own if t.course == d["name"])
+            if not n:
+                continue
+            m = mismatch_of.get(d["name"], 0)
+            weighted += m * n
+            if worst is None or m > worst[1]:
+                worst = (d["name"], m)
+        district_rows.append({
+            "district": name,
+            "mismatch": round(weighted / len(own)),
+            "trainees": len(own),
+            "top_gap_course": worst[0] if worst else None,
+        })
+
+    return {"courses": course_rows, "districts": district_rows, "evidence": _tier_pct(gap_tiers)}
+
 @app.get("/trainees")
 def get_trainees(
     cohort: Optional[str] = None,
@@ -1690,6 +1896,86 @@ def assign_dispute_officer(
 # -------------------------------------------------------------------
 # Reviews & Feedback
 # -------------------------------------------------------------------
+# Declared before /reviews/{trainee_id}: a path parameter would otherwise
+# capture the literal "insights" and this handler would never run.
+@app.get("/reviews/insights")
+def get_review_insights(
+    cohort: Optional[str] = None,
+    course: Optional[str] = None,
+    provider: Optional[str] = None,
+    district: Optional[str] = None,
+    demographic: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    What trainees said about their training, computed from submitted reviews.
+
+    Returned "128 reviews, 88.5% job-ready" as constants. Now: the actual
+    responses, per question, in the shape the insights panel reads. With few
+    reviews submitted the numbers are small — which is the truth, and grows
+    as trainees use the Quick Review.
+    """
+    rows = _filtered_trainees(db, cohort, course, provider, district, demographic)
+    ids = {t.id for t in rows}
+    reviews = [r for r in db.query(Review).all() if r.trainee_id in ids] if ids else []
+
+    def bucket_for(score, options):
+        # 4-point scale back to the option a trainee would have chosen
+        if score is None:
+            return None
+        idx = max(0, min(3, 4 - int(round(score))))
+        return options[idx]
+
+    questions = []
+    for qid, col, options in _REVIEW_QUESTIONS:
+        values = [getattr(r, col) for r in reviews if getattr(r, col) is not None]
+        counts = {o: 0 for o in options}
+        for v in values:
+            b = bucket_for(v, options)
+            if b:
+                counts[b] += 1
+        mean = sum(values) / len(values) if values else None
+        questions.append({
+            "id": qid,
+            "responses": len(values),
+            "out_of_five": round(mean / 4 * 5, 1) if mean is not None else None,
+            "distribution": [
+                {"value": o, "count": counts[o], "pct": round(counts[o] / len(values) * 100) if values else 0}
+                for o in options
+            ],
+        })
+
+    rec = [r.would_recommend for r in reviews if r.would_recommend is not None]
+    recommend_rate = round(sum(1 for v in rec if v >= 3) / len(rec) * 100) if rec else None
+
+    by_provider = {}
+    for t in rows:
+        by_provider.setdefault(t.provider_id, []).append(t.id)
+    provider_rows = []
+    pmap = {p.id: p.name for p in db.query(Provider).all()}
+    for pid, tids in by_provider.items():
+        prs = [r for r in reviews if r.trainee_id in set(tids)]
+        if not prs:
+            continue
+        q = [r.overall_quality for r in prs if r.overall_quality is not None]
+        provider_rows.append({
+            "id": pid,
+            "name": pmap.get(pid, pid),
+            "responses": len(prs),
+            "out_of_five": round(sum(q) / len(q) / 4 * 5, 1) if q else None,
+        })
+    provider_rows.sort(key=lambda x: -(x["out_of_five"] or 0))
+
+    return {
+        "eligible": len(rows),
+        "responses": len(reviews),
+        "response_rate": round(len(reviews) / len(rows) * 100) if rows else 0,
+        "recommend_rate": recommend_rate,
+        "questions": questions,
+        "providers": provider_rows,
+    }
+
+
 @app.get("/reviews/{trainee_id}")
 def get_review(trainee_id: str, db: Session = Depends(get_db)):
     r = db.query(Review).filter(Review.trainee_id == trainee_id).first()
@@ -1723,34 +2009,33 @@ def submit_review(
         r = Review(id=f"REV-{datetime.utcnow().strftime('%M%S%f')[:8]}", trainee_id=tid)
         db.add(r)
 
-    r.overall_quality = body.get("overall_quality", 4.0)
-    r.job_usefulness = body.get("job_usefulness", 4.0)
-    r.trainer_score = body.get("trainer_score", 4.0)
-    r.skill_confidence = body.get("skill_confidence", 4.0)
-    r.would_recommend = body.get("would_recommend", 4.0)
-    r.feedback = body.get("feedback", "")
+    # The Quick Review form sends option values under `answers`; this handler
+    # read top-level floats that were never present, so every review saved the
+    # 4.0 default and the trainee's actual answers were dropped on the floor.
+    answers = body.get("answers") or {}
+
+    def score(question, fallback_key=None):
+        v = answers.get(question)
+        if v is None and fallback_key:
+            v = body.get(fallback_key)
+        if isinstance(v, (int, float)):
+            return float(v)
+        return float(_REVIEW_SCORES.get(str(v), 0)) if v is not None else None
+
+    for col, q in (
+        ("overall_quality", "overall_quality"),
+        ("job_usefulness", "job_usefulness"),
+        ("trainer_score", "trainer_rating"),
+        ("skill_confidence", "confidence"),
+        ("would_recommend", "recommend"),
+    ):
+        val = score(q, col)
+        if val is not None:
+            setattr(r, col, val)
+    r.feedback = body.get("feedback") or answers.get("feedback") or r.feedback
     db.commit()
     return {"status": "success", "review_id": r.id}
 
-@app.get("/reviews/insights")
-def get_review_insights(
-    provider: Optional[str] = None,
-    course: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    return {
-        "average_rating": 4.4,
-        "total_reviews": 128,
-        "job_readiness_score": 88.5,
-        "curriculum_relevance": 91.2,
-        "recommend_rate": 86.0,
-        "top_rated_skills": ["Surgical tray preparation", "Biomedical sanitation", "Patient triage"],
-        "areas_for_improvement": ["Advanced EHR software hands-on time"]
-    }
-
-# -------------------------------------------------------------------
-# Consent Management (DPDPA 2023)
-# -------------------------------------------------------------------
 @app.get("/consent")
 def list_consents(
     current_user: Optional[User] = Depends(get_current_user_optional),
