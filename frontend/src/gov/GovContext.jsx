@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { STRINGS } from './i18n.js'
+import { translate, STRINGS } from './i18n.js'
 import { setFormatLocale } from '../lib/format.js'
 
 const GovContext = createContext(null)
@@ -34,16 +34,7 @@ export function GovProvider({ children }) {
     document.documentElement.setAttribute('data-contrast', contrast)
   }, [contrast])
 
-  const t = (key, ...args) => {
-    const dict = STRINGS[lang] || STRINGS.en
-    let str = dict[key] !== undefined ? dict[key] : (STRINGS.en[key] || key)
-    if (args.length > 0 && typeof str === 'string') {
-      args.forEach((arg, i) => {
-        str = str.replace(new RegExp(`\\{${i}\\}`, 'g'), arg)
-      })
-    }
-    return str
-  }
+  const t = (key, ...args) => translate(lang, key, ...args)
 
   const openPolicy = (tab = 'privacy') => {
     setPolicyModal({ open: true, tab })
