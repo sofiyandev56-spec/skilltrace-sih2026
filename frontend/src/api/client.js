@@ -11,7 +11,10 @@ import * as mock from './mock/handlers.js'
 
 export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 const FORCE_MOCK = import.meta.env.VITE_FORCE_MOCK === '1'
-const TIMEOUT_MS = 2500
+// Long enough for the whole-cohort analytics (about 2 s cold on a laptop),
+// short enough that an absent backend still falls back before the page
+// feels stuck. 2.5 s was chosen when the backend was assumed to be missing.
+const TIMEOUT_MS = 8000
 
 /* ---- mode tracking -------------------------------------------------- */
 

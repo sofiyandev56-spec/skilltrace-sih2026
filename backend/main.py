@@ -89,6 +89,14 @@ app = FastAPI(
     description="Backend for National Skill Traceability Authority with RBAC for Government, Trainee & Employer Portals"
 )
 
+@app.middleware("http")
+async def _invalidate_on_write(request, call_next):
+    response = await call_next(request)
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        bust_analytics()
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -481,33 +489,55 @@ def _tier_pct(tiers):
     return {k: round(v / n * 100) for k, v in tiers.items()} | {"total": n}
 
 
-def _events_by_trainee(db: Session, ids):
-    """
-    Events per trainee, as plain rows rather than ORM objects.
+# ---- shared analytics snapshot ---------------------------------------
+# The dashboard page fires the dashboard, provider table, skill-gap chart and
+# attention panel together, and each was loading the same ~32,000 events on a
+# single process — serialising past the client's 2.5 s timeout and falling
+# back to the offline store. All four now read one snapshot, built once per
+# data version and invalidated by any write (see the middleware below), so
+# consent withdrawal still shows on the very next request.
+import threading
 
-    Hydrating ~32,000 Event instances took the whole-cohort dashboard to
-    9.7 s cold and 1.1 s warm — past the client's 2.5 s timeout on first
-    load, so the page fell back to the offline store and the badge read
-    "Mock data". Selecting columns gives rows with the same attribute
-    access at a fraction of the cost.
-    """
-    out = {}
+_data_version = 0
+_snapshot = {"version": -1, "trainees": None, "events_by": None, "withdrawn": None}
+_snapshot_lock = threading.Lock()
+
+_TRAINEE_COLS = (
+    Trainee.id, Trainee.name, Trainee.course, Trainee.district, Trainee.gender,
+    Trainee.age_group, Trainee.category, Trainee.cohort, Trainee.provider_id,
+    Trainee.employer, Trainee.salary,
+)
+_EVENT_COLS = (
+    Event.id, Event.trainee_id, Event.date, Event.what_happened,
+    Event.job_role, Event.employer, Event.salary, Event.source, Event.trust_level,
+)
+
+
+def bust_analytics():
+    global _data_version
+    _data_version += 1
+
+
+def _analytics_snapshot(db: Session):
+    """(all trainee rows, events keyed by trainee, withdrawn ids), cached."""
+    with _snapshot_lock:
+        if _snapshot["version"] == _data_version and _snapshot["trainees"] is not None:
+            return _snapshot["trainees"], _snapshot["events_by"], _snapshot["withdrawn"]
+        trainees = db.query(*_TRAINEE_COLS).all()
+        events_by = {}
+        for r in db.query(*_EVENT_COLS).order_by(Event.date).all():
+            events_by.setdefault(r.trainee_id, []).append(r)
+        withdrawn = {c.trainee_id for c in db.query(Consent.trainee_id).filter(Consent.granted == False).all()}
+        _snapshot.update(version=_data_version, trainees=trainees, events_by=events_by, withdrawn=withdrawn)
+        return trainees, events_by, withdrawn
+
+
+def _events_by_trainee(db: Session, ids):
+    """Events per trainee for the given ids, from the shared snapshot."""
+    _, events_by, _ = _analytics_snapshot(db)
     if not ids:
-        return out
-    cols = (Event.id, Event.trainee_id, Event.date, Event.what_happened,
-            Event.job_role, Event.employer, Event.salary, Event.source, Event.trust_level)
-    q = db.query(*cols).order_by(Event.date)
-    # Skip the IN-list entirely for the whole cohort; SQLite's parameter cap
-    # is well below 15,000 anyway.
-    if len(ids) < 900:
-        q = q.filter(Event.trainee_id.in_(ids))
-        rows = q.all()
-    else:
-        wanted = set(ids)
-        rows = [r for r in q.all() if r.trainee_id in wanted]
-    for r in rows:
-        out.setdefault(r.trainee_id, []).append(r)
-    return out
+        return {}
+    return {i: events_by[i] for i in ids if i in events_by}
 
 
 def _retention_at(own, events_by, offset):
@@ -550,29 +580,28 @@ def _meta():
     return _COURSES, _DISTRICTS
 
 
-def _filtered_trainees(db, cohort=None, course=None, provider=None, district=None, demographic=None):
-    # Columns only: the analytics never write, and 13,000 ORM instances cost
-    # more to build than the aggregation they feed.
-    q = db.query(
-        Trainee.id, Trainee.name, Trainee.course, Trainee.district, Trainee.gender,
-        Trainee.age_group, Trainee.category, Trainee.cohort, Trainee.provider_id,
-        Trainee.employer, Trainee.salary,
-    )
-    if cohort:
-        q = q.filter(Trainee.cohort == cohort)
-    if course:
-        q = q.filter(Trainee.course == course)
-    if provider:
-        q = q.filter(Trainee.provider_id == provider)
-    if district:
-        q = q.filter(Trainee.district == district)
+def _filtered_trainees(db, cohort=None, course=None, provider=None, district=None, demographic=None,
+                       include_withdrawn=False):
+    trainees, _, withdrawn = _analytics_snapshot(db)
+    dem_key = dem_val = None
     if demographic and ":" in demographic:
-        key, val = demographic.split(":", 1)
-        col = {"gender": Trainee.gender, "age_group": Trainee.age_group, "category": Trainee.category}.get(key)
-        if col is not None:
-            q = q.filter(col == val)
-    withdrawn = withdrawn_trainee_ids(db)
-    return [t for t in q.all() if t.id not in withdrawn]
+        dem_key, dem_val = demographic.split(":", 1)
+    out = []
+    for t in trainees:
+        if not include_withdrawn and t.id in withdrawn:
+            continue
+        if cohort and t.cohort != cohort:
+            continue
+        if course and t.course != course:
+            continue
+        if provider and t.provider_id != provider:
+            continue
+        if district and t.district != district:
+            continue
+        if dem_key and getattr(t, dem_key, None) != dem_val:
+            continue
+        out.append(t)
+    return out
 
 
 def withdrawn_trainee_ids(db: Session) -> set:
@@ -581,10 +610,9 @@ def withdrawn_trainee_ids(db: Session) -> set:
 
     The privacy strip on the dashboard promises that a withdrawal removes the
     person from every figure — "not anonymised, not retained in the
-    denominator, removed". The frontend's offline store honoured that; the
-    API counted them anyway. Every aggregate now subtracts this set first.
+    denominator, removed". Every aggregate subtracts this set first.
     """
-    return {c.trainee_id for c in db.query(Consent.trainee_id).filter(Consent.granted == False).all()}
+    return _analytics_snapshot(db)[2]
 
 
 def require_admin(current_user: Optional[User]) -> User:
@@ -1113,8 +1141,14 @@ def get_dashboard(
             elif key == "category":
                 query = query.filter(Trainee.category == val)
 
+    # Role scoping above still applies through `query`; the analytics rows
+    # come from the shared snapshot so the four dashboard calls share one load.
+    scoped_ids = {t.id for t in query.with_entities(Trainee.id).all()}
     withdrawn = withdrawn_trainee_ids(db)
-    trainees = [t for t in query.all() if t.id not in withdrawn]
+    trainees = [
+        t for t in _filtered_trainees(db, cohort, course, provider, district, demographic)
+        if t.id in scoped_ids and t.id not in withdrawn
+    ]
     total = len(trainees)
 
     # ------------------------------------------------------------------
@@ -1125,10 +1159,7 @@ def get_dashboard(
     # not move when its filters do is not a dashboard.
     # ------------------------------------------------------------------
     ids = [t.id for t in trainees]
-    events_by = {}
-    if ids:
-        for e in db.query(Event).filter(Event.trainee_id.in_(ids)).order_by(Event.date).all():
-            events_by.setdefault(e.trainee_id, []).append(e)
+    events_by = _events_by_trainee(db, ids)
 
     def days_between(a: str, b: str) -> int:
         try:
@@ -1281,8 +1312,10 @@ def get_dashboard(
 
     # "X of Y records included": Y is everyone the filter matched before the
     # withdrawn were removed, so the strip can say how many it took out.
-    matched_ids = [t.id for t in query.all()]
-    total_consents = len(matched_ids)
+    total_consents = sum(
+        1 for t in _filtered_trainees(db, cohort, course, provider, district, demographic, include_withdrawn=True)
+        if t.id in scoped_ids
+    )
     granted_consents = total
 
     return {
@@ -1456,7 +1489,14 @@ def get_provider_detail(
     }
 
 @app.get("/attention")
-def get_attention(db: Session = Depends(get_db)):
+def get_attention(
+    cohort: Optional[str] = None,
+    course: Optional[str] = None,
+    provider: Optional[str] = None,
+    district: Optional[str] = None,
+    demographic: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
     """
     Ranked findings an officer can act on, per training centre.
 
@@ -1466,10 +1506,14 @@ def get_attention(db: Session = Depends(get_db)):
     a headline, the unit it concerns, and a sentence saying why.
     """
     providers = {p.id: p for p in db.query(Provider).all()}
+    # Shared snapshot, and the dashboard's own filters, so the findings
+    # describe the same population as the figures beside them.
     withdrawn = withdrawn_trainee_ids(db)
-    trainees = [t for t in db.query(Trainee).all() if t.id not in withdrawn]
-    events = [e for e in db.query(Event).all() if e.trainee_id not in withdrawn]
-    disputes = [d for d in db.query(Dispute).all() if d.trainee_id not in withdrawn]
+    trainees = _filtered_trainees(db, cohort, course, provider, district, demographic)
+    events_by = _events_by_trainee(db, [t.id for t in trainees])
+    events = [e for evs in events_by.values() for e in evs]
+    in_scope = {t.id for t in trainees}
+    disputes = [d for d in db.query(Dispute).all() if d.trainee_id in in_scope]
 
     placed = {e.trainee_id for e in events if e.what_happened == "placed"}
     retained = {e.trainee_id for e in events if e.what_happened == "still_working"}
