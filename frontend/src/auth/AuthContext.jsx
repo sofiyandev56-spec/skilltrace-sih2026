@@ -271,6 +271,14 @@ export function AuthProvider({ children }) {
         isEmployer,
         role: isMinistry ? 'ministry' : role,
         googleConfigured: Boolean(GOOGLE_CLIENT_ID),
+        // Master status is read from the server's own answer, not inferred
+        // from an email string in the browser.
+        isMasterAdmin: Boolean(session?.is_master || session?.permissions?.is_master_admin),
+        listUsers: backendAuth.listUsers,
+        assignRole: backendAuth.assignRole,
+        whitelistUser: backendAuth.whitelistUser,
+        deleteUser: backendAuth.deleteUser,
+        listAuditLogs: backendAuth.listAuditLogs,
         modalState,
         openLogin,
         closeLogin,

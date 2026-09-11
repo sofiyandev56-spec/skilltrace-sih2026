@@ -11,6 +11,17 @@ export const ROUTE_META = {
   '/ministry/follow-up': { titleKey: 'titleFollowup', descKey: 'descFollowup', sectionKey: 'navOversight' },
   '/ministry/audit': { titleKey: 'titleAudit', descKey: 'descAudit', sectionKey: 'secTransparency' },
   '/ministry/login': { titleKey: 'titleMinistryLogin', descKey: 'descMinistryLogin', sectionKey: 'secAccess' },
+  '/ministry/master-portal': {
+    titleKey: 'mpTitle',
+    descKey: 'mpSubtitle',
+    sectionKey: 'secAccess',
+  },
+  '/ministry/audit-logs': {
+    titleKey: 'alTitle',
+    descKey: 'alSubtitle',
+    sectionKey: 'secTransparency',
+  },
+  '/employer': { titleKey: 'edTitle', descKey: 'edSubtitle', sectionKey: 'navEmployer' },
   '/client': { titleKey: 'titleClient', descKey: 'descClient', sectionKey: 'navRights' },
   '/client/consent': { titleKey: 'titleConsent', descKey: 'descConsent', sectionKey: 'navRights' },
   '/client/check-in': { titleKey: 'titleCheckin', descKey: 'descCheckin', sectionKey: 'navCollection' },

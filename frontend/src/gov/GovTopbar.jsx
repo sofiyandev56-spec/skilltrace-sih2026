@@ -21,9 +21,10 @@ const TEXT_SIZES = [
 
 export default function GovTopbar() {
   const { lang, setLang, textSize, setTextSize, contrast, setContrast, t, openPolicy } = useGov()
-  const { user, officer, isAuthenticated, isMinistry, openLogin, logout, logoutMinistry } = useAuth()
-  // The chip shows whichever session owns the page you are on.
-  const identity = isMinistry ? officer : user
+  const { user, officer, employer, isMinistry, isEmployer, openLogin, logout, logoutMinistry } =
+    useAuth()
+  // One session, shown under whichever role it holds.
+  const identity = isMinistry ? officer : isEmployer ? employer : user
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
   useDismiss(menuRef, () => setMenuOpen(false), menuOpen)
@@ -111,7 +112,7 @@ export default function GovTopbar() {
                   <span
                     className={`gov-user-chip__badge gov-user-chip__badge--${isMinistry ? 'ministry' : 'client'}`}
                   >
-                    {isMinistry ? 'GOV' : 'CIT'}
+                    {isMinistry ? 'GOV' : isEmployer ? 'EMP' : 'CIT'}
                   </span>
                   <span className="gov-user-chip__name">{identity.name}</span>
                   <span className="gov-user-chip__caret" aria-hidden="true">
@@ -125,7 +126,11 @@ export default function GovTopbar() {
                       <strong>{identity.name}</strong>
                       <span>
                         {isMinistry
-                          ? `${identity.designation} · ${identity.officer_id}`
+                          ? [identity.designation, identity.officer_id ?? identity.id]
+                              .filter(Boolean)
+                              .join(' · ')
+                          : isEmployer
+                          ? [identity.designation, identity.company_name].filter(Boolean).join(' · ')
                           : t('citizenTrainee')}
                       </span>
                     </div>

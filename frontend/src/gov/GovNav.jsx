@@ -25,7 +25,11 @@ export default function GovNav({ counts = { disputes: 0, followup: 0 }, onResetD
       badgeClass: 'nav-badge--warning',
     },
     { path: '/ministry/audit', key: 'navAuditTrail', badge: null },
+    { path: '/ministry/master-portal', key: 'navMasterPortal', badge: null },
+    { path: '/ministry/audit-logs', key: 'navAuditLogs', badge: null },
   ]
+
+  const employerItems = [{ path: '/employer', key: 'navEmployer', badge: null }]
 
   const clientItems = [
     { path: '/client', key: 'navMyDashboard', badge: null },
@@ -33,7 +37,8 @@ export default function GovNav({ counts = { disputes: 0, followup: 0 }, onResetD
     { path: '/client/check-in', key: 'navSubmitCheckin', badge: null },
   ]
 
-  const navItems = isMinistry ? ministryItems : role === 'client' ? clientItems : []
+  const navItems =
+    isMinistry ? ministryItems : role === 'employer' ? employerItems : role === 'client' ? clientItems : []
 
   return (
     <nav className="gov-nav" aria-label="Primary Navigation">

@@ -138,3 +138,45 @@ export async function verifyOtp(phone, otp, traineeId = null) {
     session: res.data?.user ? toSession(res.data) : null,
   }
 }
+
+/* ---- Master Portal operations --------------------------------------
+ * Every call below is refused by the server without a government token;
+ * the UI hides them too, but the server is what actually decides.
+ */
+
+async function authed(path, { method = 'GET', body } = {}) {
+  const token = getToken()
+  const headers = {}
+  if (body) headers['Content-Type'] = 'application/json'
+  if (token) headers.Authorization = `Bearer ${token}`
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    })
+    let data = null
+    try {
+      data = await res.json()
+    } catch {
+      data = null
+    }
+    if (!res.ok) return { ok: false, status: res.status, detail: data?.detail ?? null }
+    return { ok: true, data }
+  } catch {
+    return { ok: false, status: 0, detail: null }
+  }
+}
+
+export const listUsers = () => authed('/api/admin/users')
+
+export const assignRole = (userId, role) =>
+  authed('/api/admin/users/assign-role', { method: 'POST', body: { user_id: userId, role } })
+
+export const whitelistUser = (email, role) =>
+  authed('/api/admin/users/whitelist', { method: 'POST', body: { email, role } })
+
+export const deleteUser = (userId) =>
+  authed(`/api/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' })
+
+export const listAuditLogs = () => authed('/api/admin/audit-logs')

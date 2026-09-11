@@ -11,7 +11,7 @@ import GovFooter from './gov/GovFooter.jsx'
 import GovPolicyModal from './gov/GovPolicyModal.jsx'
 import AuthModal from './auth/AuthModal.jsx'
 import { ToastProvider } from './components/Toast.jsx'
-import { ClientRoute, MinistryRoute } from './auth/ProtectedRoute.jsx'
+import { ClientRoute, EmployerRoute, MinistryRoute } from './auth/ProtectedRoute.jsx'
 import { routeMetaFor } from './routes.js'
 import Dashboard from './pages/Dashboard.jsx'
 import Disputes from './pages/Disputes.jsx'
@@ -23,6 +23,9 @@ import MinistryLogin from './pages/MinistryLogin.jsx'
 import ProviderDetail from './pages/ProviderDetail.jsx'
 import AuditTrail from './pages/AuditTrail.jsx'
 import ChatbotWidget from './chatbot/ChatbotWidget.jsx'
+import EmployerDashboard from './pages/EmployerDashboard.jsx'
+import MasterPortal from './pages/MasterPortal.jsx'
+import GovAuditLogs from './pages/GovAuditLogs.jsx'
 
 /** Keeps the browser tab title in step with the page and the language. */
 function useDocumentTitle() {
@@ -111,6 +114,18 @@ export default function App() {
             path="/ministry/providers/:id"
             element={<MinistryRoute><ProviderDetail /></MinistryRoute>}
           />
+
+          <Route
+            path="/ministry/master-portal"
+            element={<MinistryRoute><MasterPortal /></MinistryRoute>}
+          />
+          <Route
+            path="/ministry/audit-logs"
+            element={<MinistryRoute><GovAuditLogs /></MinistryRoute>}
+          />
+
+          {/* ---- Employer: confirming their own people ---- */}
+          <Route path="/employer" element={<EmployerRoute><EmployerDashboard /></EmployerRoute>} />
 
           {/* ---- Client: the trainee's own record and rights ---- */}
           <Route path="/client" element={<ClientRoute><ClientDashboard /></ClientRoute>} />

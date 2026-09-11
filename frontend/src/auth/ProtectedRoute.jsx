@@ -100,3 +100,50 @@ export function ClientRoute({ children }) {
     </div>
   )
 }
+
+/**
+ * Employer pages. An officer is admitted too: verifying a milestone on an
+ * employer's behalf is part of dispute resolution, and the server authorises
+ * the write either way.
+ */
+export function EmployerRoute({ children }) {
+  const { isEmployer, isMinistry, isAuthenticated, openLogin } = useAuth()
+  const { t } = useGov()
+  const navigate = useNavigate()
+
+  if (isEmployer || isMinistry) return children
+
+  if (isAuthenticated) {
+    return (
+      <div className="auth-guard-panel">
+        <div className="auth-guard-card">
+          <div className="auth-guard-icon" style={{ color: 'var(--tier-conflict)' }}>
+            &#9940;
+          </div>
+          <h3>{t('guardEmployerTitle')}</h3>
+          <p>{t('guardEmployerBody')}</p>
+          <div className="row" style={{ justifyContent: 'center', marginTop: 18 }}>
+            <button type="button" className="btn btn--primary" onClick={() => navigate('/client')}>
+              &larr; {t('guardBackToClient')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="auth-guard-panel">
+      <div className="auth-guard-card">
+        <div className="auth-guard-icon">&#128274;</div>
+        <h3>{t('guardAuthRequiredTitle')}</h3>
+        <p>{t('guardAuthRequiredBody')}</p>
+        <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
+          <button type="button" className="btn btn--primary btn--lg" onClick={() => openLogin('select')}>
+            {t('guardSignIn')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

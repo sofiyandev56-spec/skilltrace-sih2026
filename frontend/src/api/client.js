@@ -163,6 +163,17 @@ export const api = {
   /* follow-up queue */
   getFollowupQueue: () => request('/followup-queue', {}, () => mock.getFollowupQueue()),
 
+  // Employer confirmation. There is no mock fallback: an employer's own
+  // roster and the milestone they confirm are backend records, and inventing
+  // either locally would put unverified claims behind a Verified badge.
+  getEmployerTrainees: () => request('/employer/trainees', {}, () => []),
+
+  verifyMilestone: (payload) =>
+    request('/employer/verify-milestone', { method: 'POST', body: payload }, () => ({
+      ok: false,
+      offline: true,
+    })),
+
   assignFollowup: (traineeId, officer) =>
     request(
       `/followup-queue/${traineeId}/assign`,
