@@ -1347,40 +1347,87 @@ def get_providers(
     return out
 
 @app.get("/providers/{provider_id}")
-def get_provider_detail(provider_id: str, db: Session = Depends(get_db)):
-    """One training centre, with the per-course breakdown the detail page shows."""
+def get_provider_detail(
+    provider_id: str,
+    cohort: Optional[str] = None,
+    course: Optional[str] = None,
+    district: Optional[str] = None,
+    demographic: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """One training centre, in the shape the detail page reads: overall
+    figures, a confidence score, and a per-course breakdown."""
     provider = db.query(Provider).filter(Provider.id == provider_id).first()
     if not provider:
         raise HTTPException(status_code=404, detail="Training centre not found.")
 
-    trainees = db.query(Trainee).filter(Trainee.provider_id == provider_id).all()
-    ids = [t.id for t in trainees]
-    events = db.query(Event).filter(Event.trainee_id.in_(ids)).all() if ids else []
+    own = _filtered_trainees(db, cohort, course, provider_id, district, demographic)
+    events_by = _events_by_trainee(db, [t.id for t in own])
+    courses_def, _ = _meta()
+    intended = {c["name"]: c.get("intended_role") for c in courses_def}
+    total = len(own)
 
-    placed = {e.trainee_id for e in events if e.what_happened == "placed"}
-    retained = {e.trainee_id for e in events if e.what_happened == "still_working"}
-    high = {e.trainee_id for e in events if e.trust_level == "high"}
-
-    by_course: Dict[str, Dict[str, Any]] = {}
-    for t in trainees:
-        slot = by_course.setdefault(t.course, {"course": t.course, "certified": 0, "employed": 0})
+    tiers = _empty_tiers()
+    employed = placed_ever = role_matched = stale = 0
+    by_course = {}
+    for t in own:
+        evs = events_by.get(t.id, [])
+        slot = by_course.setdefault(t.course, {
+            "course": t.course, "intended_role": intended.get(t.course),
+            "certified": 0, "employed": 0, "role_matched": 0, "tiers": _empty_tiers(),
+        })
         slot["certified"] += 1
-        if t.id in retained:
+        if any(e.what_happened == "placed" for e in evs):
+            placed_ever += 1
+        bucket, trust, ev = _classify(evs)
+        if bucket == "employed":
+            employed += 1
             slot["employed"] += 1
+            if trust in tiers:
+                tiers[trust] += 1
+                slot["tiers"][trust] += 1
+            if ev is not None and ev.job_role and ev.job_role == intended.get(t.course):
+                role_matched += 1
+                slot["role_matched"] += 1
+        if trust == "stale":
+            stale += 1
 
-    total = len(trainees) or 1
+    def pct(n):
+        return round(n / total * 1000) / 10 if total else 0
+
+    evidence = _tier_pct(tiers)
+    # How much of a centre's reported success rests on evidence it did not
+    # produce itself.
+    confidence = round(evidence["high"] * 1.0 + evidence["medium"] * 0.6 + evidence["low"] * 0.2)
+
     return {
         "id": provider.id,
         "name": provider.name,
         "district": provider.district,
-        "certified_count": len(trainees),
-        "headline_placement_pct": round(len(placed) / total * 100, 1),
-        "verified_employment_pct": round(len(retained) / total * 100, 1),
-        "proof_gap": round((len(placed) - len(retained)) / total * 100, 1),
-        "independently_verified_pct": round(len(high) / total * 100, 1),
-        "courses": list(by_course.values()),
+        "status": "Active",
+        "courses": sorted({t.course for t in own}),
+        "certified_count": total,
+        "employment_pct": pct(employed),
+        "headline_placement_pct": pct(placed_ever),
+        "verified_pct": evidence["high"],
+        "role_matched_pct": pct(role_matched),
+        "stale_pct": pct(stale),
+        "confidence_score": min(100, confidence),
+        "evidence": evidence,
+        "by_course": sorted([
+            {
+                "course": c["course"],
+                "intended_role": c["intended_role"],
+                "certified": c["certified"],
+                "employed": c["employed"],
+                "employment_pct": round(c["employed"] / c["certified"] * 1000) / 10 if c["certified"] else 0,
+                "role_match_pct": round(c["role_matched"] / c["certified"] * 1000) / 10 if c["certified"] else 0,
+                "evidence": _tier_pct(c["tiers"]),
+            }
+            for c in by_course.values()
+        ], key=lambda x: -x["certified"]),
+        "as_of": AS_OF,
     }
-
 
 @app.get("/attention")
 def get_attention(db: Session = Depends(get_db)):
