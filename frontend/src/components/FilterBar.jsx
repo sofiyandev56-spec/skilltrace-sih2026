@@ -1,12 +1,11 @@
 import { AGE_GROUPS, CATEGORIES, COHORTS, COURSES, DISTRICTS, GENDERS } from '../api/mock/dataset.js'
 import { useGov } from '../gov/GovContext.jsx'
-import { useAuth } from '../auth/AuthContext.jsx'
 
-function Select({ label, value, onChange, disabled, children }) {
+function Select({ label, value, onChange, children }) {
   return (
     <label className="field">
       <span className="label">{label}</span>
-      <select value={value || ''} onChange={(e) => onChange(e.target.value || '')} disabled={disabled}>
+      <select value={value || ''} onChange={(e) => onChange(e.target.value || '')}>
         {children}
       </select>
     </label>
@@ -19,25 +18,8 @@ function Select({ label, value, onChange, disabled, children }) {
  */
 export default function FilterBar({ filters, onChange, providers = [], resultCount }) {
   const { t } = useGov()
-  const { officer } = useAuth()
-  const assignedDistrict = officer?.district || null
-
-  const set = (key) => (value) => {
-    if (key === 'district' && assignedDistrict) return
-    onChange({
-      ...filters,
-      [key]: value,
-      ...(assignedDistrict ? { district: assignedDistrict } : {}),
-    })
-  }
-
+  const set = (key) => (value) => onChange({ ...filters, [key]: value })
   const active = Object.entries(filters).filter(([, v]) => v)
-  const availableDistricts = assignedDistrict ? [assignedDistrict] : DISTRICTS
-  const clearableActive = assignedDistrict ? active.filter(([k]) => k !== 'district') : active
-
-  const handleClearAll = () => {
-    onChange(assignedDistrict ? { district: assignedDistrict } : {})
-  }
 
   const DEMOGRAPHICS = [
     { group: t('age'), options: AGE_GROUPS.map((v) => ({ value: `age_group:${v}`, label: `${v} ${t('years')}` })) },
@@ -78,14 +60,9 @@ export default function FilterBar({ filters, onChange, providers = [], resultCou
         ))}
       </Select>
 
-      <Select
-        label={t('district')}
-        value={assignedDistrict || filters.district}
-        onChange={set('district')}
-        disabled={Boolean(assignedDistrict)}
-      >
-        {!assignedDistrict && <option value="">{t('allDistricts')}</option>}
-        {availableDistricts.map((d) => (
+      <Select label={t('district')} value={filters.district} onChange={set('district')}>
+        <option value="">{t('allDistricts')}</option>
+        {DISTRICTS.map((d) => (
           <option key={d} value={d}>{d}</option>
         ))}
       </Select>
@@ -105,8 +82,8 @@ export default function FilterBar({ filters, onChange, providers = [], resultCou
         <button
           type="button"
           className="btn btn--sm"
-          onClick={handleClearAll}
-          disabled={clearableActive.length === 0}
+          onClick={() => onChange({})}
+          disabled={active.length === 0}
         >
           {t('clearAll')}
         </button>
@@ -125,15 +102,13 @@ export default function FilterBar({ filters, onChange, providers = [], resultCou
             {active.map(([k, v]) => (
               <span className="chip" key={k}>
                 {labelFor(k, v)}
-                {!(assignedDistrict && k === 'district') && (
-                  <button
-                    type="button"
-                    onClick={() => onChange({ ...filters, [k]: '', ...(assignedDistrict ? { district: assignedDistrict } : {}) })}
-                    aria-label={`${t('removeFilter')} ${labelFor(k, v)}`}
-                  >
-                    ×
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => onChange({ ...filters, [k]: '' })}
+                  aria-label={`${t('removeFilter')} ${labelFor(k, v)}`}
+                >
+                  ×
+                </button>
               </span>
             ))}
             <span className="faint">{t('allConditionsMustMatch')}</span>

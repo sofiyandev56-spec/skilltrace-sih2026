@@ -5,7 +5,6 @@ import { EvidenceBadge } from '../components/Evidence.jsx'
 import Modal from '../components/Modal.jsx'
 import { longDate } from '../lib/format.js'
 import { useGov } from '../gov/GovContext.jsx'
-import { useAuth } from '../auth/AuthContext.jsx'
 
 /**
  * Event names are interface text, not record data, so they are translated
@@ -155,9 +154,7 @@ function EventDetail({ event, onClose }) {
 
 export default function AuditTrail() {
   const { t } = useGov()
-  const { officer } = useAuth()
-  const districtFilter = officer?.district ? { district: officer.district } : {}
-  const { data, loading } = useApi(() => api.getAuditLog(districtFilter), [officer?.district])
+  const { data, loading } = useApi(() => api.getAuditLog({}), [])
   const [detail, setDetail] = useState(null)
   const [sourceFilter, setSourceFilter] = useState('all')
 
@@ -178,10 +175,10 @@ export default function AuditTrail() {
               {loading
                 ? t('loadingSourceEvents')
                 : t(
-                    'showingEvents',
-                    (data?.showing || 0).toLocaleString('en-IN'),
-                    (data?.total || 0).toLocaleString('en-IN'),
-                  )}
+                  'showingEvents',
+                  (data?.showing || 0).toLocaleString('en-IN'),
+                  (data?.total || 0).toLocaleString('en-IN'),
+                )}
             </p>
           </div>
           <span className="pill pill--resolved" title={t('appendOnlyNote')}>

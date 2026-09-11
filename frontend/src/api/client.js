@@ -125,7 +125,7 @@ export const api = {
   getAuditLog: (f = {}) => request(`/audit${qs(f)}`, {}, () => mock.getAuditLog(f)),
 
   /* disputes */
-  getDisputes: (f = {}) => request(`/disputes${qs(f)}`, {}, () => mock.getDisputes(f)),
+  getDisputes: () => request('/disputes', {}, () => mock.getDisputes()),
 
   resolveDispute: (id, body) =>
     request(`/disputes/${id}/resolve`, { method: 'POST', body }, () => mock.resolveDispute(id, body)),
@@ -161,7 +161,7 @@ export const api = {
   postCheckin: (body) => request('/checkin', { method: 'POST', body }, () => mock.postCheckin(body)),
 
   /* follow-up queue */
-  getFollowupQueue: (f = {}) => request(`/followup-queue${qs(f)}`, {}, () => mock.getFollowupQueue(f)),
+  getFollowupQueue: () => request('/followup-queue', {}, () => mock.getFollowupQueue()),
 
   // Employer confirmation. There is no mock fallback: an employer's own
   // roster and the milestone they confirm are backend records, and inventing

@@ -16,15 +16,6 @@ import {
 } from './dataset.js'
 import { QUESTION_BY_ID, REVIEW_QUESTIONS, asFive, meanScore } from '../../lib/review.js'
 import * as store from './store.js'
-import { readSession } from '../../auth/ministryAuth.js'
-
-function getEffectiveDistrict(f = {}) {
-  const session = readSession()
-  if (session?.district) {
-    return session.district
-  }
-  return f.district || null
-}
 
 /* ------------------------------------------------------------------ */
 /* outcome classification                                              */
@@ -171,13 +162,12 @@ function matchesDemographic(trainee, demographic) {
 }
 
 export function applyFilters(trainees, f = {}) {
-  const effectiveDistrict = getEffectiveDistrict(f)
   return trainees.filter(
     (t) =>
       (!f.cohort || t.cohort === f.cohort) &&
       (!f.course || t.course === f.course) &&
       (!f.provider || t.provider_id === f.provider) &&
-      (!effectiveDistrict || t.district === effectiveDistrict) &&
+      (!f.district || t.district === f.district) &&
       matchesDemographic(t, f.demographic),
   )
 }
@@ -326,12 +316,9 @@ export function getDashboard(filters = {}) {
     { stage: 'Role-matched', count: roleMatched, note: 'Working in the trained occupation' },
   ].map((s) => ({ ...s, pct: total ? Math.round((s.count / total) * 1000) / 10 : 0 }))
 
-  const effectiveDistrict = getEffectiveDistrict(filters)
-  const appliedFilters = effectiveDistrict ? { ...filters, district: effectiveDistrict } : filters
-
   return {
     as_of: AS_OF,
-    filters_applied: appliedFilters,
+    filters_applied: filters,
     total_trainees: total,
     headline_placement_pct,
     headline_placement_count: everPlaced,
@@ -497,13 +484,8 @@ function withOfficer(d) {
   return { ...d, officer }
 }
 
-export function getDisputes(filters = {}) {
-  const effectiveDistrict = getEffectiveDistrict(filters)
-  let list = store.currentData().disputes.map(withOfficer)
-  if (effectiveDistrict) {
-    list = list.filter((d) => d.district === effectiveDistrict)
-  }
-  return list
+export function getDisputes() {
+  return store.currentData().disputes.map(withOfficer)
 }
 
 export function getFieldOfficers() {
@@ -543,13 +525,8 @@ export function resolveDispute(id, body = {}) {
   return store.currentData().disputes.find((d) => d.id === id)
 }
 
-export function getFollowupQueue(filters = {}) {
-  const effectiveDistrict = getEffectiveDistrict(filters)
-  let list = store.currentData().followupQueue
-  if (effectiveDistrict) {
-    list = list.filter((f) => f.district === effectiveDistrict)
-  }
-  return list
+export function getFollowupQueue() {
+  return store.currentData().followupQueue
 }
 
 export function assignFollowup(traineeId, officer) {
@@ -1003,11 +980,7 @@ export function getAttention(filters = {}) {
   }
 
   // Disputes are the sharpest call on an officer's time — always surface them.
-  const effectiveDistrict = getEffectiveDistrict(filters)
-  const disputesList = effectiveDistrict
-    ? data.disputes.filter((x) => x.district === effectiveDistrict)
-    : data.disputes
-  const openDisputes = disputesList.filter((x) => x.status !== 'resolved' && !x.assigned_officer_id)
+  const openDisputes = data.disputes.filter((x) => x.status !== 'resolved' && !x.assigned_officer_id)
   if (openDisputes.length) {
     findings.push({
       id: 'disputes',
@@ -1016,7 +989,7 @@ export function getAttention(filters = {}) {
       headline: 'Disputed records awaiting an officer',
       unit: `${openDisputes.length} record${openDisputes.length === 1 ? '' : 's'}`,
       unit_id: null,
-      district: effectiveDistrict || null,
+      district: null,
       detail:
         'The employer and the trainee disagree on these outcomes. Neither claim is counted in any figure on this dashboard until an officer establishes the facts.',
       action: 'Assign a field officer',
