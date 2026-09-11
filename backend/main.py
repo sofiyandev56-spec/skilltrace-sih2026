@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, status, Query, Body
+from fastapi import Response
 from fastapi.responses import RedirectResponse
 
 # Credentials live in backend/.env, which is gitignored. Loaded before any
@@ -1593,13 +1594,25 @@ def get_skill_gap(
 
 @app.get("/trainees")
 def get_trainees(
+    response: Response,
     cohort: Optional[str] = None,
     course: Optional[str] = None,
     district: Optional[str] = None,
     search: Optional[str] = None,
+    limit: int = Query(500, ge=1, le=2000),
+    offset: int = Query(0, ge=0),
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
+    """
+    Trainee records, paged.
+
+    This used to return all 15,000 rows with every event embedded — 11 MB
+    in about thirty seconds, one Event query per trainee — which was over the
+    client's 2.5 s timeout, so every caller silently fell back to the offline
+    store. Events are now fetched in one query for the page, the page is
+    bounded, and the full count travels in X-Total-Count.
+    """
     q = db.query(Trainee)
 
     # Strict Role Restriction
@@ -1625,10 +1638,15 @@ def get_trainees(
             )
         )
 
-    results = q.all()
+    withdrawn = withdrawn_trainee_ids(db)
+    if withdrawn:
+        q = q.filter(~Trainee.id.in_(withdrawn))
+    response.headers["X-Total-Count"] = str(q.count())
+    results = q.order_by(Trainee.id).offset(offset).limit(limit).all()
+    events_by = _events_by_trainee(db, [t.id for t in results])
     out = []
     for t in results:
-        evs = db.query(Event).filter(Event.trainee_id == t.id).all()
+        evs = events_by.get(t.id, [])
         out.append({
             "id": t.id,
             "name": t.name,
