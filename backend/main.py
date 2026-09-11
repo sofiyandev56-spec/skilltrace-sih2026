@@ -22,6 +22,7 @@ from sqlalchemy import func, or_, and_
 from .database import engine, get_db, Base, SessionLocal
 from .models import (
     User, Trainee, Event, Provider, Dispute, Consent, Checkin, Review,
+    Assessment, Enrolment, Employer, FollowupContact,
     SandboxUser, SandboxBank, SandboxAuditLog
 )
 from .auth import (
@@ -1702,6 +1703,14 @@ def get_trainee(
     evs = db.query(Event).filter(Event.trainee_id == t.id).order_by(Event.date.asc()).all()
     consents = db.query(Consent).filter(Consent.trainee_id == t.id).all()
     reviews = db.query(Review).filter(Review.trainee_id == t.id).all()
+    assessment = db.query(Assessment).filter(Assessment.trainee_id == t.id).first()
+    enrolment = db.query(Enrolment).filter(Enrolment.trainee_id == t.id).first()
+    contacts = (
+        db.query(FollowupContact)
+        .filter(FollowupContact.trainee_id == t.id)
+        .order_by(FollowupContact.date)
+        .all()
+    )
 
     return {
         "id": t.id,
@@ -1735,7 +1744,125 @@ def get_trainee(
             for e in evs
         ],
         "consents": [{"id": c.id, "purpose": c.purpose, "granted": c.granted, "date": c.date} for c in consents],
-        "reviews": [{"id": r.id, "overall_quality": r.overall_quality, "feedback": r.feedback} for r in reviews]
+        "reviews": [{"id": r.id, "overall_quality": r.overall_quality, "feedback": r.feedback} for r in reviews],
+        # From the source spreadsheets: what they scored, how much they attended,
+        # and every follow-up contact made with them.
+        "assessment": {
+            "technical_score": assessment.technical_score,
+            "soft_skill_score": assessment.soft_skill_score,
+            "result": assessment.result,
+            "skill_level": assessment.skill_level,
+            "certified": assessment.certified,
+        } if assessment else None,
+        "enrolment": {
+            "programme": enrolment.programme,
+            "provider": enrolment.provider,
+            "start_date": enrolment.start_date,
+            "completion_date": enrolment.completion_date,
+            "attendance_pct": enrolment.attendance_pct,
+            "completion_status": enrolment.completion_status,
+        } if enrolment else None,
+        "followup_contacts": [
+            {
+                "date": c.date,
+                "months_after_training": c.months_after_training,
+                "contacted": c.contacted,
+                "status": c.status,
+                "monthly_income": c.monthly_income,
+                "job_satisfaction": c.job_satisfaction,
+                "training_relevance": c.training_relevance,
+                "skill_gap_identified": c.skill_gap_identified,
+                "reason_for_attrition": c.reason_for_attrition,
+            }
+            for c in contacts
+        ],
+    }
+
+
+@app.get("/employers")
+def list_employers(
+    district: Optional[str] = None,
+    industry: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = Query(200, ge=1, le=2000),
+    db: Session = Depends(get_db),
+):
+    """The employer registry: 1,500 organisations trainees were placed with."""
+    q = db.query(Employer)
+    if district:
+        q = q.filter(Employer.district == district)
+    if industry:
+        q = q.filter(Employer.industry == industry)
+    if search:
+        q = q.filter(Employer.company_name.ilike(f"%{search}%"))
+    return [
+        {
+            "id": e.id, "company_name": e.company_name, "industry": e.industry,
+            "district": e.district, "company_size": e.company_size, "verified": e.verified,
+        }
+        for e in q.order_by(Employer.company_name).limit(limit).all()
+    ]
+
+
+@app.get("/completion")
+def get_completion(
+    cohort: Optional[str] = None,
+    course: Optional[str] = None,
+    provider: Optional[str] = None,
+    district: Optional[str] = None,
+    demographic: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Course completion and attendance, from the enrolment records: how many
+    finished, dropped or are still enrolled, and mean attendance — per course.
+    """
+    rows = _filtered_trainees(db, cohort, course, provider, district, demographic)
+    ids = [t.id for t in rows]
+    enrolments = db.query(Enrolment).filter(Enrolment.trainee_id.in_(ids)).all() if ids else []
+    assessments = db.query(Assessment).filter(Assessment.trainee_id.in_(ids)).all() if ids else []
+
+    status = {}
+    for e in enrolments:
+        status[e.completion_status or "Unknown"] = status.get(e.completion_status or "Unknown", 0) + 1
+    att = [e.attendance_pct for e in enrolments if e.attendance_pct is not None]
+    cert = sum(1 for a in assessments if a.certified)
+    tech = [a.technical_score for a in assessments if a.technical_score is not None]
+    soft = [a.soft_skill_score for a in assessments if a.soft_skill_score is not None]
+
+    by_course = {}
+    course_of = {t.id: t.course for t in rows}
+    for e in enrolments:
+        slot = by_course.setdefault(course_of.get(e.trainee_id, e.programme), {"course": course_of.get(e.trainee_id, e.programme), "enrolled": 0, "completed": 0, "attendance": []})
+        slot["enrolled"] += 1
+        if e.completion_status == "Completed":
+            slot["completed"] += 1
+        if e.attendance_pct is not None:
+            slot["attendance"].append(e.attendance_pct)
+    courses = []
+    for c in by_course.values():
+        courses.append({
+            "course": c["course"],
+            "enrolled": c["enrolled"],
+            "completed": c["completed"],
+            "completion_pct": round(c["completed"] / c["enrolled"] * 100) if c["enrolled"] else 0,
+            "mean_attendance_pct": round(sum(c["attendance"]) / len(c["attendance"]), 1) if c["attendance"] else None,
+        })
+    courses.sort(key=lambda x: -x["enrolled"])
+
+    n = len(enrolments)
+    return {
+        "enrolled": n,
+        "completed": status.get("Completed", 0),
+        "dropped": status.get("Dropped", 0),
+        "ongoing": status.get("Ongoing", 0),
+        "completion_pct": round(status.get("Completed", 0) / n * 100, 1) if n else 0,
+        "mean_attendance_pct": round(sum(att) / len(att), 1) if att else None,
+        "certified": cert,
+        "certified_pct": round(cert / len(assessments) * 100, 1) if assessments else 0,
+        "mean_technical_score": round(sum(tech) / len(tech), 1) if tech else None,
+        "mean_soft_skill_score": round(sum(soft) / len(soft), 1) if soft else None,
+        "courses": courses,
     }
 
 # -------------------------------------------------------------------

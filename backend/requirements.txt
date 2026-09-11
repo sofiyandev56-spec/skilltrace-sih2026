@@ -5,3 +5,4 @@ pyjwt
 pydantic
 requests
 python-dotenv
+openpyxl

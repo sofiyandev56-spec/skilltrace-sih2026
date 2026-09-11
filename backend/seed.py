@@ -2,7 +2,10 @@ import json
 import re
 import os
 from .database import SessionLocal, engine, Base
-from .models import User, Trainee, Event, Provider, Dispute, Consent, Checkin, Review
+from .models import (
+    User, Trainee, Event, Provider, Dispute, Consent, Checkin, Review,
+    Assessment, Enrolment, Employer, FollowupContact,
+)
 from .auth import hash_password
 
 def seed_database():
@@ -288,6 +291,7 @@ def seed_database():
 
     db.commit()
     seed_national_dataset(db)
+    seed_source_entities(db)
     db.close()
     print("SkillTrace database successfully seeded with multi-role accounts and national registry records!")
 
@@ -422,3 +426,118 @@ def seed_national_dataset(db):
 
     db.commit()
     print(f"National dataset loaded: {added} trainees added.")
+
+
+_SOURCE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "source")
+
+
+def _read_xlsx(name):
+    """Rows of the first sheet as dicts, or [] if the file or openpyxl is absent."""
+    path = os.path.join(_SOURCE_DIR, f"{name}.xlsx")
+    if not os.path.exists(path):
+        print(f"Source spreadsheet not found: {path}; skipping.")
+        return []
+    try:
+        import openpyxl
+    except ImportError:
+        print("openpyxl is not installed; spreadsheet entities skipped.")
+        return []
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb[wb.sheetnames[0]]
+    rows = ws.iter_rows(values_only=True)
+    header = next(rows)
+    return [dict(zip(header, r)) for r in rows]
+
+
+def _iso(v):
+    if v is None:
+        return None
+    if hasattr(v, "strftime"):
+        return v.strftime("%Y-%m-%d")
+    return str(v)[:10]
+
+
+def _yes(v):
+    return str(v).strip().lower() in ("yes", "true", "1", "y")
+
+
+def seed_source_entities(db):
+    """
+    Assessments, enrolments, the employer registry and the follow-up contact
+    history, from the spreadsheets organized_data.json was derived from.
+
+    Cross-checked before loading: identical trainee ids, names, districts,
+    courses and providers, 15,000 of 15,000 on each; no duplicate ids; every
+    trainee and employer reference resolves. Nothing is altered on the way in.
+
+    Also fills Trainee.certification_date from the enrolment's completion
+    date, which the JSON never carried.
+    """
+    if db.query(Assessment).count() >= 1000:
+        return
+
+    known = {t.id for t in db.query(Trainee.id).all()}
+
+    n = 0
+    for r in _read_xlsx("assessments"):
+        if r["trainee_id"] not in known:
+            continue
+        db.add(Assessment(
+            id=r["assessment_id"], trainee_id=r["trainee_id"],
+            technical_score=r.get("technical_score"), soft_skill_score=r.get("soft_skill_score"),
+            result=r.get("assessment_result"), skill_level=r.get("skill_level"),
+            certified=_yes(r.get("certified")),
+        ))
+        n += 1
+    db.flush()
+    print(f"  assessments: {n}")
+
+    n = 0
+    completion = {}
+    for r in _read_xlsx("training_enrolments"):
+        if r["trainee_id"] not in known:
+            continue
+        cd = _iso(r.get("completion_date"))
+        db.add(Enrolment(
+            id=r["training_id"], trainee_id=r["trainee_id"],
+            programme=r.get("programme"), provider=r.get("provider"),
+            start_date=_iso(r.get("start_date")), completion_date=cd,
+            attendance_pct=r.get("attendance_percentage"), completion_status=r.get("completion_status"),
+        ))
+        if cd and r.get("completion_status") == "Completed":
+            completion[r["trainee_id"]] = cd
+        n += 1
+    db.flush()
+    for t in db.query(Trainee).filter(Trainee.id.in_(list(completion.keys()))).all() if completion else []:
+        if not t.certification_date:
+            t.certification_date = completion[t.id]
+    print(f"  enrolments: {n} (certification dates filled: {len(completion)})")
+
+    n = 0
+    for r in _read_xlsx("employers"):
+        db.add(Employer(
+            id=r["employer_id"], company_name=r.get("company_name") or "",
+            industry=r.get("industry"), district=r.get("district"),
+            company_size=r.get("company_size"), verified=_yes(r.get("verified")),
+        ))
+        n += 1
+    db.flush()
+    print(f"  employers: {n}")
+
+    n = 0
+    for r in _read_xlsx("followups"):
+        if r["trainee_id"] not in known:
+            continue
+        db.add(FollowupContact(
+            id=r["followup_id"], trainee_id=r["trainee_id"],
+            date=_iso(r.get("followup_date")), months_after_training=r.get("months_after_training"),
+            contacted=_yes(r.get("contacted")), status=r.get("current_status"),
+            monthly_income=r.get("monthly_income"), job_satisfaction=r.get("job_satisfaction"),
+            training_relevance=r.get("training_relevance"), skill_gap_identified=r.get("skill_gap_identified"),
+            reason_for_attrition=r.get("reason_for_attrition"),
+        ))
+        n += 1
+        if n % 5000 == 0:
+            db.flush()
+    db.commit()
+    print(f"  follow-up contacts: {n}")

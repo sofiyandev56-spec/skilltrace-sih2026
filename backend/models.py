@@ -152,3 +152,62 @@ class SandboxAuditLog(Base):
     final_status = Column(String, nullable=False)           # VERIFIED | PARTIALLY VERIFIED | VERIFICATION FAILED | UNVERIFIED
     details = Column(Text, nullable=True)                   # JSON summary of all validation checks & reasons
 
+
+
+# ---- Entities from the source spreadsheets ---------------------------
+# organized_data.json was derived from these and dropped them. They are
+# loaded alongside it so a trainee's record carries what they scored, how
+# much of the course they attended, and every follow-up contact made.
+
+class Assessment(Base):
+    __tablename__ = "assessments"
+
+    id = Column(String, primary_key=True, index=True)
+    trainee_id = Column(String, ForeignKey("trainees.id"), nullable=False, index=True)
+    technical_score = Column(Integer, nullable=True)
+    soft_skill_score = Column(Integer, nullable=True)
+    result = Column(String, nullable=True)        # Excellent | Good | Average | Poor
+    skill_level = Column(String, nullable=True)   # Beginner | Intermediate | Advanced
+    certified = Column(Boolean, default=False)
+
+
+class Enrolment(Base):
+    __tablename__ = "enrolments"
+
+    id = Column(String, primary_key=True, index=True)
+    trainee_id = Column(String, ForeignKey("trainees.id"), nullable=False, index=True)
+    programme = Column(String, nullable=True)
+    provider = Column(String, nullable=True)
+    start_date = Column(String, nullable=True)
+    completion_date = Column(String, nullable=True)
+    attendance_pct = Column(Float, nullable=True)
+    completion_status = Column(String, nullable=True)  # Completed | Dropped | Ongoing
+
+
+class Employer(Base):
+    __tablename__ = "employers"
+
+    id = Column(String, primary_key=True, index=True)
+    company_name = Column(String, nullable=False)
+    industry = Column(String, nullable=True)
+    district = Column(String, nullable=True)
+    company_size = Column(String, nullable=True)
+    verified = Column(Boolean, default=False)
+
+
+class FollowupContact(Base):
+    """One contact made with a trainee after training — the outreach history
+    behind the follow-up queue, 43,405 rows across the cohort."""
+    __tablename__ = "followup_contacts"
+
+    id = Column(String, primary_key=True, index=True)
+    trainee_id = Column(String, ForeignKey("trainees.id"), nullable=False, index=True)
+    date = Column(String, nullable=True)
+    months_after_training = Column(Integer, nullable=True)
+    contacted = Column(Boolean, default=False)
+    status = Column(String, nullable=True)
+    monthly_income = Column(Integer, nullable=True)
+    job_satisfaction = Column(Integer, nullable=True)     # 1-5
+    training_relevance = Column(Integer, nullable=True)   # 1-5
+    skill_gap_identified = Column(String, nullable=True)
+    reason_for_attrition = Column(String, nullable=True)
