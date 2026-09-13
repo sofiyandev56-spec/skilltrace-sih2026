@@ -21,7 +21,9 @@ or simply cannot be reached. Two rules shape everything in it:
    | 🟠 **Self-reported** | `low` | Stated by the trainee, not yet independently confirmed |
    | ⚪ **Stale** | `stale` | Last confirmed more than 9 months ago — treat as out of date |
 
-This repository currently contains the **frontend** (`frontend/`).
+This repository contains the full stack: the **frontend** (`frontend/`, React +
+Vite) and the **backend** (`backend/`, FastAPI + SQLAlchemy on SQLite), plus
+the source spreadsheets the backend seeds from (`data/source/`).
 
 ---
 
@@ -43,7 +45,7 @@ not running — the frontend has fallen back to its offline copy of the dataset.
 
 To run only one side: `npm run dev:api` or `npm run dev:web`.
 
-## Backend, and running without one
+## Backend, and running the frontend without it
 
 Every call goes to the real API first and falls back to a local mock store if the
 backend is unreachable, slow (>2.5s) or errors. A badge in the top-right always
@@ -187,13 +189,38 @@ tabs.
 `AS_OF` in `frontend/src/api/mock/dataset.js` is the reference date (10 Sep 2026);
 cohorts and checkpoint maturity are computed relative to it.
 
+## What the backend provides
+
+Beyond the data endpoints listed above, `backend/` also implements:
+
+- **Authentication** — Ministry Officer sign-in, trainee login/registration,
+  Google OAuth (`/auth/*`), JWT sessions and role checks.
+- **Reviews and skill records** — field-officer reviews per trainee and a
+  downloadable skill-record PDF (`/trainees/:id/skill-record`).
+- **Employer verification** — employer-side trainee lists and milestone
+  confirmation (`/employer/*`).
+- **Admin** — user whitelisting, role assignment and an audit log (`/api/admin/*`).
+- **Bank-verification sandbox** — simulated bank statements used to produce
+  *Verified*-tier evidence (`/api/sandbox/*`).
+- **WhatsApp check-ins** — OTP, surveys and reply handling through the
+  Whapi.cloud gateway (`/api/whatsapp/*`), with a simulate-reply endpoint for
+  demos.
+- **Chat assistant** — a question-answering endpoint over the seeded data
+  (`/api/chat/ask`).
+
+Backend configuration is read from `backend/.env` (gitignored):
+`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, `CORS_ORIGINS`, `FRONTEND_ORIGIN`.
+
 ## Not built (deliberately)
 
-No login or authentication (the dashboard assumes an authenticated operator),
-no real WhatsApp Business API integration, no mobile app, no deployment or
-Docker configuration.
+No mobile app, and no deployment or Docker configuration — the project is run
+locally with `npm run dev`.
 
 ## Stack
 
-React 18 · Vite · React Router · Recharts · plain CSS (design tokens in
-`frontend/src/styles/global.css`).
+**Frontend** — React 18 · Vite · React Router · Recharts · plain CSS (design
+tokens in `frontend/src/styles/global.css`).
+
+**Backend** — FastAPI · SQLAlchemy · SQLite · PyJWT · Pydantic · openpyxl
+(spreadsheet seeding) · Whapi.cloud (WhatsApp gateway).
